@@ -1,0 +1,30 @@
+# --- Cloudron/agent working files (never publish) ---
+.claude/
+scratchpad/
+*.local
+*.local.md
+docs/*.local.md
+
+# --- Per-phase handoff / working notes (local-only, never published) ---
+phase-notes/
+
+# --- Local-only reference docs (cross-package maintainer playbook) ---
+cloudron-packaging-field-guide-*.md
+
+# --- Logo source (logo.png is the tracked, canonical copy) ---
+langfuse-logo-512.png
+
+# --- Secrets / tokens (defensive; real tokens live outside the repo) ---
+*token*.txt
+*.secret
+*.secrets
+.env
+.env.*
+!.env.example
+
+# --- Build / OS cruft ---
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+*.tmp
