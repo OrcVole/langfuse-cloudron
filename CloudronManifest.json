@@ -37,7 +37,10 @@
   "postInstallMessage": "file://POSTINSTALL.md",
   "manifestVersion": 2,
   "minBoxVersion": "9.1.0",
+  "website": "https://langfuse.com",
   "documentationUrl": "https://langfuse.com/docs",
+  "packagerName": "OrcVole",
+  "packagerUrl": "https://github.com/OrcVole/langfuse-cloudron",
   "contactEmail": "Most+github@OrcadianVole.com",
   "iconUrl": "https://raw.githubusercontent.com/OrcVole/langfuse-cloudron/main/logo.png"
 }
