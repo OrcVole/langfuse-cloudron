@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!-- Cloudron overrides merged over ClickHouse's default config.xml (config.d/*.xml is auto-loaded).
+     All persistent state lives under the backed-up /app/data; logs go to stdout; bind localhost only. -->
+<clickhouse>
+    <path>/app/data/clickhouse/</path>
+    <tmp_path>/app/data/clickhouse/tmp/</tmp_path>
+    <user_files_path>/app/data/clickhouse/user_files/</user_files_path>
+    <format_schema_path>/app/data/clickhouse/format_schemas/</format_schema_path>
+    <user_directories>
+        <users_xml><path>users.xml</path></users_xml>
+        <local_directory><path>/app/data/clickhouse/access/</path></local_directory>
+    </user_directories>
+
+    <!-- Default file logs go to read-only /var/log; redirect under /app/data and also echo to stdout
+         (Cloudron captures stdout/stderr). -->
+    <logger>
+        <console>1</console>
+        <level>warning</level>
+        <log>/app/data/clickhouse/logs/clickhouse-server.log</log>
+        <errorlog>/app/data/clickhouse/logs/clickhouse-server.err.log</errorlog>
+        <size>100M</size>
+        <count>3</count>
+    </logger>
+
+    <!-- localhost only: Langfuse connects via localhost; the docker_related_config.xml that forces
+         0.0.0.0/:: is removed at build time (Dockerfile). listen_try avoids a hard fail if v6 is off. -->
+    <listen_host>127.0.0.1</listen_host>
+    <listen_host>::1</listen_host>
+    <listen_try>1</listen_try>
+    <http_port>8123</http_port>
+    <tcp_port>9000</tcp_port>
+    <!-- single-node embedded ClickHouse: drop surfaces Langfuse never uses -->
+    <interserver_http_port remove="1"/>
+    <mysql_port remove="1"/>
+    <postgresql_port remove="1"/>
+
+    <!-- Langfuse returns empty/wrong results on a non-UTC ClickHouse (field-guide gotcha 32). -->
+    <timezone>UTC</timezone>
+
+    <!-- Absolute cap, NOT a ratio: it is unverified whether the bundled CH reads the cgroup limit or host
+         RAM; a ratio against misread host RAM could OOM-kill the container (AGENTS.md, ADR memory note). -->
+    <max_server_memory_usage>2147483648</max_server_memory_usage>
+    <mark_cache_size>536870912</mark_cache_size>
+</clickhouse>

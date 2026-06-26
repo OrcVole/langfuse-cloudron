@@ -1,0 +1,43 @@
+{
+  "id": "io.github.orcvole.langfuse",
+  "title": "Langfuse",
+  "author": "OrcVole",
+  "tagline": "Open-source LLM observability, tracing, evals and prompt management",
+  "description": "file://DESCRIPTION.md",
+  "changelog": "file://CHANGELOG.md",
+  "icon": "file://logo.png",
+  "tags": [ "notes", "project" ],
+  "version": "0.1.0",
+  "upstreamVersion": "3.199.0",
+  "healthCheckPath": "/api/public/health",
+  "httpPort": 3000,
+  "addons": {
+    "localstorage": {},
+    "postgresql": {},
+    "redis": {},
+    "oidc": {
+      "loginRedirectUri": "/api/auth/callback/custom"
+    },
+    "sendmail": {
+      "optional": true,
+      "supportsDisplayName": true
+    }
+  },
+  "httpPorts": {
+    "LANGFUSE_BLOB_DOMAIN": {
+      "title": "Langfuse Media Storage",
+      "description": "Presigned S3 endpoint for multimodal trace attachments (images, audio, files). Public — not behind Cloudron login; secured by S3 request signatures and a private bucket.",
+      "containerPort": 9100,
+      "defaultValue": "langfuse-blob"
+    }
+  },
+  "memoryLimit": 5368709120,
+  "configurePath": "/",
+  "optionalSso": true,
+  "postInstallMessage": "file://POSTINSTALL.md",
+  "manifestVersion": 2,
+  "minBoxVersion": "9.1.0",
+  "documentationUrl": "https://langfuse.com/docs",
+  "contactEmail": "Most+github@OrcadianVole.com",
+  "iconUrl": "https://raw.githubusercontent.com/OrcVole/langfuse-cloudron/main/logo.png"
+}

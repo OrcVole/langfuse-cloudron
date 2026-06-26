@@ -1,0 +1,21 @@
+# The Docker build context needs only what the Dockerfile COPYs (start.sh, supervisor/, conf/).
+# Everything else is excluded so no local-only or secret file can leak into the image.
+.git/
+.gitignore
+.claude/
+scratchpad/
+docs/
+test/
+*.md
+CloudronManifest.json
+CloudronVersions.json
+cloudron-packaging-field-guide-*.md
+langfuse-logo-512.png
+logo.png
+*token*.txt
+*.secret
+*.secrets
+.env
+.env.*
+*.local
+*.local.md
