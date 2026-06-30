@@ -1,7 +1,33 @@
 # Packaging notes — verified vs assumed (newest first)
 
 The empirical-verification log. Every entry records what was **confirmed against a running
-box/image** versus **carried over by assumption**. Anonymized (no real hostnames/emails/tokens).
+box/image** versus **carried over by assumption**. Anonymized — a **public** file: packaging
+**techniques only**, never the box's installed-app inventory, FQDNs, topology, hostnames, emails, keys,
+or tokens. "Which apps run on the box" is host-specific, treated like an FQDN or a key.
+
+---
+
+## Post-0.1.0 — ClickHouse backup race (platform bug) + v0.2.0 plan (2026-06-30)
+
+- **Observed (box):** a full backup run **aborted the whole server** on this app. The rsync syncer's
+  tree walk (`readTree`, `box/src/syncer.js`) recursed into a ClickHouse merge-temp dir
+  (`store/<uuid>/tmp_merge_*`) that vanished mid-walk (merge finalised by atomic rename) → got `null` →
+  `.sort()` on `null` threw → the **entire run** aborted, leaving later apps on stale snapshots. Root
+  cause is platform-side. Filed upstream: [`upstream-cloudron-backup-syncer-race.md`](upstream-cloudron-backup-syncer-race.md).
+- **Verified (research, multi-source):** Cloudron exposes **no live-container pre/post-backup hook**
+  (staff declined generic hooks, forum topic 8367, closed 2026-03-16); `backupCommand`/`restoreCommand`
+  run in a **temporary container** → cannot `SYSTEM STOP MERGES` the live server; **no post-backup
+  hook**. So an in-place quiesce bracket is impossible — the quiesce design is dead.
+- **Decision:** v0.1.0 ships as-is + an operational workaround ([KNOWN-ISSUES.md](KNOWN-ISSUES.md)). The
+  structural fix is the **9.1 triplet** (move the CH store to a `persistentDir` + consistent logical
+  dump) → **v0.2.0**, [ADR 0006](decisions/0006-clickhouse-backup-persistentdirs-triplet.md), with a
+  backup→restore acceptance gate **plus** a "whole-server backup no longer aborts" check.
+- **Corrects an earlier ops assumption:** "stop the app, then `cloudron backup create`" is **not** valid
+  — Cloudron does not back up a stopped app. A quiesced backup must be a filesystem/volume snapshot taken
+  *outside* the platform.
+- **Open for v0.2.0 start (box-authority):** (a) is the live app quiesced while `backupCommand`'s temp
+  container runs? (b) can `clickhouse-server`/`clickhouse-local` run in that temp container? **Study
+  Plausible's package first** (it bundles ClickHouse on Cloudron).
 
 ---
 
@@ -22,7 +48,7 @@ All four gates **GREEN** on a throwaway test install, by digest
   URL = 200/150 ms; `/etc/hosts` fallback NOT needed. New 0.1.2 detail: skip the PATCH and the download
   404s "not yet uploaded" though bytes are in MinIO.
 - **Gate 3 — update + backup/restore ✅** Real update (rc1→rc2) + real backup→in-place restore:
-  ENCRYPTION_KEY **byte-identical** (`04895f12…`) across both; `0600 cloudron` re-asserted post-restore;
+  ENCRYPTION_KEY **byte-identical** across both (full 64-hex value unchanged); `0600 cloudron` re-asserted post-restore;
   `existing secrets` path; data intact (pg 1/1/1/1, CH traces). **Bundled ClickHouse + MinIO data in
   `/app/data` survives Cloudron backup/restore** alongside addon Postgres.
 - **Gate 4 — memory ✅** (ADR 0005) Heavy-ingest peak **2.58 GiB**; worst-case bound ~4.6 GiB (CH 2 GiB
@@ -48,7 +74,7 @@ All four gates **GREEN** on a throwaway test install, by digest
 - **ClickHouse bound localhost-only**: removed the upstream image's `docker_related_config.xml` (forced
   `listen_host 0.0.0.0` + `::`) at build time; bind `127.0.0.1` + `::1` via the override. App still
   healthy → Langfuse reaches CH over localhost.
-- **httpPorts contract** (agentgateway): key = runtime env var = subdomain FQDN; `containerPort` = listen
+- **httpPorts contract** (verified against an existing Cloudron app on the same server): key = runtime env var = subdomain FQDN; `containerPort` = listen
   port. → `LANGFUSE_BLOB_DOMAIN` key, MinIO binds **0.0.0.0:9100** so the proxy can reach it.
 - **OIDC**: custom provider id = `custom` → `loginRedirectUri /api/auth/callback/custom`; AUTH_CUSTOM_*
   var names confirmed.
@@ -127,9 +153,9 @@ measurement.
   images (ABI-compatible for N-API), **different libc** (glibc vs musl). → Build-shape risk #1.
 - **Logo**: the provided `langfuse-logo-512.png` is **byte-identical** to the canonical upstream
   `web/public/icon512.png` (sha256 `cd876c08…`). Copied verbatim to `logo.png` (512×512 RGBA PNG).
-- **cloudron CLI is logged into the box** and lists apps. AI-stack apps confirmed present:
-  `agentgateway`, `owebui` (OpenWebUI), `docling`, `tei`, `qdrant`, `ollama`. **No `langfuse` app
-  exists yet** — clean slate.
+- **cloudron CLI is logged into the box** and lists the installed apps; **no `langfuse` app exists
+  yet** — clean slate. (Other apps on the box are intentionally not named — public doc; packaging
+  facts verified against them are cited generically as "an existing Cloudron app on the same server".)
 - Local tooling present: podman 5.8.2, docker 29.5.3, skopeo 1.22.2, buildah, git 2.54, cloudron CLI 7.0.5.
 - Both publish tokens are present and readable outside the repo (41 bytes each).
 
