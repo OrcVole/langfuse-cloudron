@@ -13,7 +13,7 @@ without a fresh backup.
 backup/restore of this app works (it passes our backup→restore round-trip gate); the failure is an
 *intermittent* collision that only happens when ClickHouse is mid-merge during the walk. It is reported
 upstream — filed on the [Cloudron forum (topic 15663)](https://forum.cloudron.io/topic/15663/backup-task-crashes-when-a-clickhouse-app-deletes-a-temp-merge-dir-mid-snapshot), with a short pointer in
-[`docs/upstream-cloudron-backup-syncer-race.md`](upstream-cloudron-backup-syncer-race.md), and **confirmed still present in Cloudron 9.2.0**. The permanent package-side fix lands in **v0.2.0**
+[`docs/upstream-cloudron-backup-syncer-race.md`](upstream-cloudron-backup-syncer-race.md), and **reproduced live on Cloudron 9.2.0** (the `readTree` null guard is positioned after the `.sort()`, so it does not prevent the crash). The permanent package-side fix lands in **v0.2.0**
 ([ADR 0006](decisions/0006-clickhouse-backup-persistentdirs-triplet.md)).
 
 ### Interim workaround (until the upstream fix and/or v0.2.0)
