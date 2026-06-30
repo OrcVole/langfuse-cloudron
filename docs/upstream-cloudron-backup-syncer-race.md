@@ -6,8 +6,8 @@ https://forum.cloudron.io/topic/15663/backup-task-crashes-when-a-clickhouse-app-
 **Summary.** A bundled-ClickHouse app's background merge temp directories (`tmp_merge_*`, `tmp_insert_*`,
 `tmp_fetch_*`) can vanish mid-snapshot while Cloudron's rsync syncer walks the data tree; `readTree` then
 calls `.sort()` on a `null` `readdir` result and crashes, which aborts the **whole-server** backup run,
-not just this app. **Confirmed still present in Cloudron 9.2.0:** the `readTree` null guard exists but is
-positioned *after* the `.sort()` (`syncer.js:31`), so it is dead code for this crash.
+not just this app. **Reproduced live on Cloudron 9.2.0:** the `readTree` null guard is
+positioned *after* the `.sort()` (`syncer.js:31`), so it does not prevent the crash.
 
 **Workaround and the package's own fix:** see [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md). The real fix is
 **v0.2.0** — the ClickHouse store moves to a `persistentDir`, backed up as a consistent logical dump via
