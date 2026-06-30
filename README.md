@@ -27,6 +27,15 @@ SDKs, OpenTelemetry exporters, and integrations can send traces.
 
 See [`docs/`](docs/) for architecture decisions (ADRs) and the verified-vs-assumed packaging notes.
 
+## Known issues
+
+- **Backups (v0.1.0):** an intermittent Cloudron *platform* race — the backup syncer can trip over a
+  ClickHouse merge-temp directory that vanishes mid-walk — can abort the **whole-server** backup run.
+  Your Langfuse data is not corrupted and normal backup/restore works; this is a platform bug, reported
+  upstream. See **[docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md)** for the interim workaround, and
+  **[ADR 0006](docs/decisions/0006-clickhouse-backup-persistentdirs-triplet.md)** for the structural fix
+  landing in v0.2.0.
+
 ## License
 
 The packaging in this repository is MIT-licensed (see [LICENSE](LICENSE)). Langfuse itself is a
