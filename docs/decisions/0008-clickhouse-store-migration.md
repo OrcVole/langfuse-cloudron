@@ -195,6 +195,16 @@ migration gate asks anyway, and it is answered there.
 - The legacy tree survives for the duration of at least one boot, so **one** backup run could still walk it
   and abort. Mitigate by updating deliberately rather than overnight: take the update immediately after a
   known-good backup and confirm `/app/data/clickhouse` is gone before the next run.
+- **The cleanup delete is itself a vanishing-directory event, and a large one.** `rm -rf` on a
+  multi-gigabyte, 200 000-file tree inside `/app/data` is exactly the shape that crashes the syncer, at
+  a scale no `tmp_merge_*` reaches, and it happens at an arbitrary moment after boot. This is accepted
+  rather than engineered around: the alternatives all fail. The tree cannot be moved out of `/app/data`
+  first, because `rename(2)` to a `persistentDir` returns `EXDEV`. Deferring the delete to the next boot
+  does not help either, since a backup can start at any time and deferring only widens the window in
+  which the full tree is walked. What the health gate does buy is that the delete happens **once, soon
+  after an update the operator chose to run**, rather than being left to coincide with a nightly run.
+  Update deliberately and confirm the tree is gone, as above, and this is a single bounded risk rather
+  than a recurring one.
 - Boot is slower, once, by the time it takes to copy the store. On the production install that is a
   multi-gigabyte copy on local ext4. The health check will not be satisfied during it, which
   [ADR 0009](0009-clickhouse-boot-decision-tree.md) addresses.
