@@ -1,9 +1,26 @@
 <?xml version="1.0"?>
 <!-- Lets `clickhouse local` write/read File backups under /app/data (the Cloudron-backed-up dir). Used
      ONLY by backup-clickhouse.sh in the temporary backup container, where the server config is not in
-     play. The same allowed_path is set for the real server in config.d/cloudron.xml. -->
+     play. The same allowed_path is set for the real server in config.d/cloudron.xml.
+
+     default_database is NOT cosmetic. Langfuse's ClickHouse migrations create the `default` database
+     explicitly, so the store carries metadata/default.sql. `clickhouse local` also creates its own
+     implicit `default`, and loading the snapshot then fails with
+     `Code: 82 ... Database default already exists ... (DATABASE_ALREADY_EXISTS)`, so no dump is ever
+     produced. Renaming the implicit database out of the way lets the store's own `default` load
+     intact, with its definition and UUID preserved, and makes `BACKUP DATABASE default` unambiguously
+     mean the store's database. (The sibling Laminar package never hit this: its schema does not
+     materialise metadata/default.sql, so there was nothing to collide with.)
+
+     The alternative (deleting metadata/default.sql from the snapshot) also works, but it discards the
+     real database definition and backs up whatever clickhouse-local's own `default` adopted, which is
+     a less faithful dump. Keep this approach.
+
+     NOTE: a double hyphen is illegal inside an XML comment and makes ClickHouse fail to start with a
+     SAXParseException, so keep prose here free of them. -->
 <clickhouse>
     <backups>
         <allowed_path>/app/data</allowed_path>
     </backups>
+    <default_database>_lf_local</default_database>
 </clickhouse>

@@ -45,8 +45,15 @@ for dst in "${PENDING[@]}"; do
   esac
   if [ -d "${src}" ]; then
     bytes="$(du -sb "${src}" 2>/dev/null | cut -f1 || echo '?')"
-    rm -rf "${src}"
-    log "removed ${src} (reclaimed ${bytes} bytes, and took it out of the backup walk)"
+    if rm -rf "${src}" && [ ! -e "${src}" ]; then
+      log "removed ${src} (reclaimed ${bytes} bytes, and took it out of the backup walk)"
+    else
+      # KEEP the marker. A half-deleted legacy tree with no marker is the exact input that makes the
+      # next boot's migration read it as a restored backup and discard the live store.
+      log "WARNING: could not fully remove ${src}. Leaving the cleanup marker in place so the next"
+      log "boot retries, and so the migration does not mistake the remains for a restored backup."
+      continue
+    fi
   fi
   rm -f "${marker}"
 done
