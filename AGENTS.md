@@ -25,8 +25,16 @@ check, gotcha 31 → see ADR 0003).
    never patch Langfuse itself.
 2. **Pin EVERYTHING by digest** (base, both langfuse images, clickhouse, minio). Exactly **one ARG
    per upstream version** (`LANGFUSE_VERSION`); the manifest mirrors it in `upstreamVersion`.
-3. **Persisted state ONLY in `/app/data`.** Re-assert ownership and mode on **every** boot (restore
-   drifts them).
+3. **Persisted state in `/app/data`, except the two stores that churn.** Re-assert ownership and mode on
+   **every** boot (restore drifts them). **Amended for v0.2.0:** the bundled ClickHouse and MinIO stores
+   move to `persistentDirs` (`/var/lib/clickhouse`, `/var/lib/minio`) because their constant
+   create-then-rename churn inside the walked tree aborts the whole server's backup run. They stay inside
+   Cloudron's backup surface via `backupCommand`/`restoreCommand`, so the *goal* of rule 3, that all state
+   is captured and restorable, is unchanged; only the mechanism moves. Anything else still belongs in
+   `/app/data`, and adding a third `persistentDir` needs an ADR. See
+   [ADR 0006](docs/decisions/0006-clickhouse-backup-persistentdirs-triplet.md),
+   [0008](docs/decisions/0008-clickhouse-store-migration.md) and
+   [0009](docs/decisions/0009-clickhouse-boot-decision-tree.md).
 4. **Fail loud.** Never silently regenerate `ENCRYPTION_KEY` or clobber operator config.
 5. **Code and docs ship together.** ADRs in `docs/decisions/`; verified-vs-assumed log in
    `docs/PACKAGING-NOTES.md` (newest first, anonymized).

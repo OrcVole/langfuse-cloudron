@@ -7,6 +7,7 @@ docs/*.local.md
 
 # --- Per-phase handoff / working notes (local-only, never published) ---
 phase-notes/
+langfuse-backup-fix-foundation.md
 
 # --- Local-only reference docs (cross-package maintainer playbook) ---
 cloudron-packaging-field-guide-*.md
