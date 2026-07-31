@@ -94,9 +94,11 @@ COPY conf/clickhouse/config.d/cloudron.xml     /etc/clickhouse-server/config.d/c
 COPY conf/clickhouse/users.d/cloudron-user.xml /etc/clickhouse-server/users.d/cloudron-user.xml
 # Remove the upstream image's docker config that binds ClickHouse to 0.0.0.0/:: — we bind localhost only
 # (listen settings are in conf/clickhouse/config.d/cloudron.xml).
+COPY conf/clickhouse/backups.xml                /etc/clickhouse-server/backups.xml
 RUN rm -f /etc/clickhouse-server/config.d/docker_related_config.xml \
  && ln -sf /usr/bin/clickhouse /usr/bin/clickhouse-server \
- && ln -sf /usr/bin/clickhouse /usr/bin/clickhouse-client
+ && ln -sf /usr/bin/clickhouse /usr/bin/clickhouse-client \
+ && ln -sf /usr/bin/clickhouse /usr/bin/clickhouse-local
 COPY --from=minio /usr/bin/minio /usr/bin/minio
 COPY --from=mc    /usr/bin/mc    /usr/bin/mc
 
@@ -110,6 +112,11 @@ RUN echo "== gate: static migrate =="   && /usr/bin/migrate -version
 RUN echo "== gate: clickhouse =="        && /usr/bin/clickhouse --version \
  && { ldd /usr/bin/clickhouse 2>&1 | grep -qi 'not found' && { echo 'clickhouse: unresolved libs'; exit 1; } || true; }
 RUN echo "== gate: minio + mc =="       && /usr/bin/minio --version && /usr/bin/mc --version
+# v0.2.0: backup/restore run in a temp container with a read-only rootfs, so everything they need must
+# already be in the image. rsync comes from cloudron/base (never installed here) — prove it, do not
+# assume it. `clickhouse local` is the multicall subcommand; the symlink above just makes it explicit.
+RUN echo "== gate: backup toolchain ==" && command -v rsync && rsync --version | head -1 \
+ && /usr/bin/clickhouse-local --version
 
 # -------------------------------------------------------------------------------------------------
 # 6. Packaging runtime: config overrides + supervisor + entrypoint. CMD, never ENTRYPOINT.
@@ -124,6 +131,6 @@ LABEL org.opencontainers.image.title="Langfuse for Cloudron" \
       org.opencontainers.image.description="Open-source Langfuse (LLM observability) packaged for Cloudron" \
       org.opencontainers.image.source="https://github.com/OrcVole/langfuse-cloudron" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="0.1.0"
+      org.opencontainers.image.version="0.2.0"
 
 CMD [ "/app/code/start.sh" ]

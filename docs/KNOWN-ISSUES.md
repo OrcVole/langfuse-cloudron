@@ -1,5 +1,32 @@
 # Known issues
 
+## An in-place restore does not roll ClickHouse back (v0.2.0 onwards)
+
+**What it is.** From v0.2.0 the ClickHouse and MinIO stores live in Cloudron `persistentDirs`, and
+**Cloudron preserves `persistentDirs` across an in-place restore**. So if you restore this app to last
+Tuesday, you get last Tuesday's Postgres data and last Tuesday's ClickHouse dump file, but the
+ClickHouse store the app actually reads is still **today's**. Your traces and observations are not
+rolled back, and the app will not tell you so beyond a line in its boot log.
+
+This is the one place where v0.2.0 behaves worse than v0.1.0, which kept raw files in `/app/data` and
+therefore rolled them back with everything else. It is the price of taking ClickHouse out of the backup
+walk, which is what stops this app aborting your whole server's backup run.
+
+**A clone is not affected.** Cloning to a new location starts with empty `persistentDirs`, so the clone
+rebuilds ClickHouse from the dump and gives you exactly the data in that backup. If what you want is a
+point-in-time copy to look at, clone rather than restore.
+
+### Recipe: making an in-place restore actually restore ClickHouse
+
+1. Perform the in-place restore as normal and let the app come up.
+2. **Stop** the app.
+3. Clear the ClickHouse store: in *Terminal* or the file manager, empty `/var/lib/clickhouse`.
+4. **Start** the app.
+
+On that boot the app finds an empty store alongside the restored dump and rebuilds ClickHouse from it,
+which takes a few minutes for a large store. To roll MinIO back too, empty `/var/lib/minio` in the same
+step. Take a backup first if there is any chance you want the current data back.
+
 ## Backups: an intermittent platform race can abort the whole-server backup run (v0.1.0)
 
 **What it is.** Langfuse bundles ClickHouse, whose storage engine constantly creates and removes
