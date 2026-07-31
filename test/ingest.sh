@@ -4,18 +4,23 @@
 #   web (ingest) -> Redis (BullMQ) -> worker -> ClickHouse + S3 event bucket -> read back via public API.
 # Usage: test/ingest.sh [IMAGE]   (default lf-cloudron:dev). ENGINE=docker to use docker.
 set -uo pipefail
-IMAGE="${1:-lf-cloudron:dev}"; ENGINE="${ENGINE:-podman}"
+IMAGE="${1:-lf-cloudron:0.2.0-dev}"; ENGINE="${ENGINE:-podman}"
 NET=lf-ing-net; VOL=lf-ing-data; PG=lf-ing-pg; RD=lf-ing-redis; APP=lf-ing-app
+# v0.2.0: the ClickHouse and MinIO stores live on persistentDirs, so give them real volumes here too --
+# otherwise they land in the container's writable layer and vanish, and the boot legs go untested.
+CHVOL=lf-ing-ch; MVOL=lf-ing-minio
 PGPASS="ing$(date +%s 2>/dev/null||echo 1)"; RPASS="rd${PGPASS}"
 PK=pk-lf-1111111111111111111111111111111111; SK=sk-lf-2222222222222222222222222222222222
 fails=0; ok(){ echo "PASS: $*"; }; bad(){ echo "FAIL: $*"; fails=$((fails+1)); }
-cleanup(){ $ENGINE rm -f $APP $PG $RD >/dev/null 2>&1; $ENGINE volume rm $VOL >/dev/null 2>&1; $ENGINE network rm $NET >/dev/null 2>&1; }
+cleanup(){ $ENGINE rm -f $APP $PG $RD >/dev/null 2>&1; $ENGINE volume rm $VOL $CHVOL $MVOL >/dev/null 2>&1; $ENGINE network rm $NET >/dev/null 2>&1; }
 trap cleanup EXIT; cleanup
 $ENGINE network create $NET >/dev/null; $ENGINE volume create $VOL >/dev/null
+$ENGINE volume create $CHVOL >/dev/null; $ENGINE volume create $MVOL >/dev/null
 $ENGINE run -d --name $PG --network $NET -e POSTGRES_USER=langfuse -e POSTGRES_PASSWORD="$PGPASS" -e POSTGRES_DB=langfuse docker.io/library/postgres:17 >/dev/null
 $ENGINE run -d --name $RD --network $NET docker.io/library/redis:7 redis-server --requirepass "$RPASS" --maxmemory-policy noeviction >/dev/null
 sleep 6
 $ENGINE run -d --name $APP --network $NET -p 3000:3000 -v $VOL:/app/data \
+  -v $CHVOL:/var/lib/clickhouse -v $MVOL:/var/lib/minio \
   -e CLOUDRON=1 -e CLOUDRON_POSTGRESQL_URL="postgresql://langfuse:${PGPASS}@${PG}:5432/langfuse" \
   -e CLOUDRON_REDIS_HOST=$RD -e CLOUDRON_REDIS_PORT=6379 -e CLOUDRON_REDIS_PASSWORD="$RPASS" \
   -e CLOUDRON_APP_ORIGIN="http://localhost:3000" \
@@ -46,8 +51,14 @@ done
 
 ch=$($ENGINE exec $APP sh -c '. /app/data/.secrets/secrets.env; curl -s "http://localhost:8123/?user=clickhouse&password=${CLICKHOUSE_PASSWORD}" --data-binary "SELECT count() FROM traces"' 2>/dev/null)
 { [ -n "$ch" ] && [ "$ch" -ge 1 ] 2>/dev/null; } && ok "ClickHouse has >=1 trace row ($ch)" || bad "ClickHouse trace count=$ch"
-ev=$($ENGINE exec $APP sh -c 'find /app/data/minio/langfuse/events -type f 2>/dev/null | wc -l')
+ev=$($ENGINE exec $APP sh -c 'find /var/lib/minio/langfuse/events -type f 2>/dev/null | wc -l')
 [ "${ev:-0}" -ge 1 ] && ok "event object written to bundled MinIO ($ev)" || bad "no event objects in MinIO"
+
+stray=$($ENGINE exec $APP sh -c 'ls -A /app/data/clickhouse /app/data/minio 2>/dev/null | wc -l')
+[ "${stray:-0}" = 0 ] && ok "no churning store left inside the backed-up /app/data" \
+  || bad "something is still under /app/data/{clickhouse,minio} ($stray entries) — the syncer race is not fixed"
+chp=$($ENGINE exec $APP sh -c 'ls -d /var/lib/clickhouse/store >/dev/null 2>&1 && echo yes || echo no')
+[ "$chp" = yes ] && ok "ClickHouse store is on its persistentDir" || bad "ClickHouse store not at /var/lib/clickhouse"
 
 echo "=== ingest result: $fails failure(s) ==="
 exit $(( fails > 0 ? 1 : 0 ))

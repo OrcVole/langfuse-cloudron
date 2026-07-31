@@ -27,19 +27,23 @@ log() { echo "==> [migrate] $*"; }
 # own markers, because they do not exist in the source.
 RSYNC_COMMON=( -a --delete --exclude='/.migration-in-progress'
                              --exclude='/.migration-verified'
-                             --exclude='/.migration-cleanup-pending' )
+                             --exclude='/.migration-cleanup-pending'
+                             --exclude='/.rebuild-in-progress' )
 RSYNC_CH=( --exclude='/status' --exclude='/tmp/' --exclude='/shadow/' --exclude='tmp_*' )
 
 # A legacy tree counts as "present" only when it actually HOLDS DATA, never merely because the directory
 # exists. This is load-bearing, not fastidiousness: if anything ever recreates an empty /app/data/clickhouse
 # after a completed migration, a bare -d test would read it as a restored legacy backup and discard the
 # live persistentDir. Requiring real content makes that impossible.
+# A sentinel directory that EXISTS but is EMPTY does not count. `rm -rf` unlinks the top directory
+# last, so a killed cleanup routinely leaves a bare store/ skeleton behind; treating that as data
+# would let it masquerade as a restored legacy backup and destroy a live multi-gigabyte store.
 store_populated() {                       # $1 = path, $2 = space-separated sentinel subdirs ("" = any content)
   local path="$1" sentinels="${2:-}" s
   [ -d "${path}" ] || return 1
   if [ -n "${sentinels}" ]; then
     for s in ${sentinels}; do
-      [ -d "${path}/${s}" ] && return 0
+      [ -d "${path}/${s}" ] && [ -n "$(ls -A "${path}/${s}" 2>/dev/null)" ] && return 0
     done
     return 1
   fi
@@ -74,7 +78,10 @@ migrate_store() {
   # currently holds anything worth mentioning. Deliberately NOT decided by comparing mtimes: Cloudron's
   # restore preserves them, so a restored legacy tree is routinely OLDER than the marker it must beat.
   # Resuming our own interrupted copy is excluded here and handled in step 4.
-  if [ ! -e "${marker_prog}" ] && [ -n "$(ls -A "${dst}" 2>/dev/null)" ]; then
+  # NOTE the destination test uses store_populated, NOT `ls -A`. start.sh must not create anything
+  # inside a persistentDir before this runs, but defence in depth is cheap and the consequence of
+  # getting it wrong is destroying a live store: an incidental subdirectory must never read as data.
+  if [ ! -e "${marker_prog}" ] && store_populated "${dst}" "${sentinels}"; then
     log "${label}: legacy data at ${src} while ${dst} is already populated and no migration of ours"
     log "${label}: is outstanding. Reading this as a pre-0.2.0 backup restored onto 0.2.0, which is"
     log "${label}: what an operator restoring that backup is asking for. DISCARDING the current"
@@ -108,20 +115,33 @@ migrate_store() {
   # This asks exactly the right question ("is anything still missing or different?") and accounts for
   # the excludes automatically, because it uses the same ones. Comparing du totals would not: totals
   # can match while files differ, and the excludes mean the two trees are legitimately not identical.
-  local pending
-  pending="$(rsync "${RSYNC_COMMON[@]}" "${extra[@]}" --dry-run --itemize-changes "${src}/" "${dst}/" 2>/dev/null || true)"
+  # This is the last gate before cleanup-legacy-stores.sh deletes the only other copy of the data, so
+  # it must FAIL CLOSED. Capture rsync's status and let its stderr reach the boot log: discarding
+  # either would turn "rsync could not run" into "nothing left to transfer", i.e. "verified".
+  local pending vrc=0
+  pending="$(rsync "${RSYNC_COMMON[@]}" "${extra[@]}" --dry-run --itemize-changes "${src}/" "${dst}/" 2>&1)" || vrc=$?
+  if [ "${vrc}" -ne 0 ]; then
+    log "${label}: FATAL: the verification pass itself failed (rc=${vrc}). Treating as NOT verified."
+    printf '%s\n' "${pending}" | head -20 | sed 's/^/    /' || true
+    log "${label}: marker left in place; refusing to start."
+    return 1
+  fi
   if [ -n "${pending}" ]; then
     log "${label}: FATAL: verification found work still outstanding after the copy:"
-    printf '%s\n' "${pending}" | head -20 | sed 's/^/    /'
+    # `| head` would SIGPIPE printf, and pipefail would then abort before the explanation below.
+    printf '%s\n' "${pending}" | head -20 | sed 's/^/    /' || true
     log "${label}: marker left in place; refusing to start."
     return 1
   fi
   log "${label}: verified complete ($(du -sb "${dst}" 2>/dev/null | cut -f1 || echo '?') bytes, $(find "${dst}" -type f 2>/dev/null | wc -l) files)"
 
   # ---- Step 7: publish the result -----------------------------------------------------------------
+  # Clear the in-progress marker FIRST. A crash between the two publish writes would otherwise leave
+  # all three markers present, and step 2 would then return early forever, so the stale in-progress
+  # marker would permanently suppress the legacy-restore branch for a genuine future restore.
+  rm -f "${marker_prog}"
   printf 'source=%s\nverified=%s\n' "${src}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${marker_done}"
   printf '%s\n' "${src}" > "${marker_clean}"
-  rm -f "${marker_prog}"
   chown -R cloudron:cloudron "${dst}"
   log "${label}: migration complete. Legacy tree kept until the app is proven healthy."
 }
@@ -131,5 +151,8 @@ CH_DST=/var/lib/clickhouse
 MINIO_SRC=/app/data/minio
 MINIO_DST=/var/lib/minio
 
+# MinIO's sentinel is .minio.sys, the directory the server itself creates to mark a real store. The
+# bucket directory will NOT do: start.sh pre-creates it, so using it would make an empty layout count
+# as data. restore-clickhouse.sh keys off the same sentinel, deliberately.
 migrate_store clickhouse "${CH_SRC}"    "${CH_DST}"    "store metadata" "${RSYNC_CH[@]}"
-migrate_store minio      "${MINIO_SRC}" "${MINIO_DST}" ""
+migrate_store minio      "${MINIO_SRC}" "${MINIO_DST}" ".minio.sys"

@@ -36,6 +36,10 @@ make_legacy() {                 # $1 = data dir, $2 = number of filler files
   mkdir -p "$1/clickhouse/store/778/aaaa/tmp_merge_202607_1_2_3"
   echo x > "$1/clickhouse/store/778/aaaa/tmp_merge_202607_1_2_3/junk"
   echo lock > "$1/clickhouse/status"
+  # .minio.sys is what a real MinIO store always carries, and it is the sentinel the migration keys
+  # off. Omitting it made an earlier version of this fixture unrealistically easy to satisfy.
+  mkdir -p "$1/minio/.minio.sys/buckets" "$1/minio/.minio.sys/tmp"
+  echo '{"version":"1"}' > "$1/minio/.minio.sys/format.json"
   echo "blob" > "$1/minio/langfuse/object.bin"
 }
 
@@ -114,7 +118,35 @@ grep -q "live-and-precious" "${PERS}/clickhouse/store/live/data.bin" 2>/dev/null
 printf '%s' "${OUT}" | grep -q "DISCARDING" && bad "wrongly treated an empty dir as a restored backup" \
   || ok "did not treat an empty dir as a restored backup"
 
-case_ "6. Fresh install with no legacy data does nothing"
+case_ "6. Destination pre-created by start.sh must NOT read as a restored legacy backup"
+# The regression that 20 green assertions missed: start.sh used to create the persistentDir subdirs
+# before leg 0, so "destination is empty" was never true and the DISCARD branch fired on every
+# ordinary update. These cases pin the destination in the state a boot can actually leave it in.
+new_case precreated
+make_legacy "${DATA}" 8
+mkdir -p "${PERS}/clickhouse"/{logs,tmp,access,user_files,format_schemas} "${PERS}/minio/langfuse"
+OUT="$(run_migrate "${DATA}" "${PERS}")"
+printf '%s' "${OUT}" | grep -q "DISCARDING" && bad "pre-created layout was misread as a restored backup" \
+  || ok "pre-created empty layout is not mistaken for data"
+[ "$(ls "${PERS}"/clickhouse/store/778/aaaa/part-*.bin 2>/dev/null | wc -l)" -eq 8 ] \
+  && ok "migration still ran and copied everything" || bad "migration did not complete"
+[ -f "${PERS}/minio/langfuse/object.bin" ] && ok "MinIO migrated despite the pre-created bucket dir" \
+  || bad "MinIO did not migrate"
+
+case_ "7. An EMPTY sentinel directory must not count as data"
+# `rm -rf` unlinks the top directory last, so a killed cleanup leaves a bare store/ skeleton. If that
+# counts as a legacy store, it discards the live persistentDir and the loss is total and silent.
+new_case skeleton
+mkdir -p "${DATA}/clickhouse/store" "${DATA}/minio"
+mkdir -p "${PERS}/clickhouse/store/live" "${PERS}/clickhouse/metadata"
+echo "live-and-precious" > "${PERS}/clickhouse/store/live/data.bin"
+OUT="$(run_migrate "${DATA}" "${PERS}")"
+grep -q "live-and-precious" "${PERS}/clickhouse/store/live/data.bin" 2>/dev/null \
+  && ok "live store survives an empty store/ skeleton" || bad "LIVE STORE DESTROYED by an empty store/ skeleton"
+printf '%s' "${OUT}" | grep -q "DISCARDING" && bad "empty skeleton treated as a restored backup" \
+  || ok "empty skeleton correctly ignored"
+
+case_ "8. Fresh install with no legacy data does nothing"
 new_case fresh
 OUT="$(run_migrate "${DATA}" "${PERS}")"
 [ -z "$(ls -A "${PERS}/clickhouse" 2>/dev/null)" ] && ok "persistentDir left empty" || bad "wrote something on a fresh install"

@@ -34,6 +34,21 @@ log() { echo "==> [backup] $*"; }
 status() { printf '%s  %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "${STATUS}" 2>/dev/null || true; }
 fail() { log "FATAL: $*"; status "FAILED: $*"; exit "${2:-1}"; }
 
+# ---- 0. Interlock: never dump a store that is mid-migration or mid-rebuild -----------------------
+# Publishing is destructive (the previous dump is replaced), and both the migration and the leg-3
+# rebuild pass through states where store/ and metadata/ exist but are INCOMPLETE. Without this check
+# a backup landing in that window would overwrite the last good dump with a truncated one, and a
+# subsequent rebuild would restore from the truncation. Exit non-zero so the run is recorded as
+# failed rather than quietly producing a bad backup.
+for _m in .migration-in-progress .rebuild-in-progress; do
+  if [ -e "${CH_STORE}/${_m}" ] || [ -e "${MINIO_STORE}/${_m}" ]; then
+    log "FATAL: a store is mid-operation (${_m} present). Refusing to publish a dump over the"
+    log "last good one from a store that is not yet complete. Retry once the app has settled."
+    status "FAILED: refused, ${_m} present"
+    exit 1
+  fi
+done
+
 # ---- 1. ClickHouse FIRST, so it is the OLDER capture ---------------------------------------------
 if [ ! -d "${CH_STORE}/store" ] && [ ! -d "${CH_STORE}/metadata" ]; then
   log "ClickHouse persistentDir empty or absent — nothing to dump"

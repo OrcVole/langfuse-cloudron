@@ -28,8 +28,11 @@ log() { echo "==> [restore] $*"; }
 
 # ---- MinIO: a plain copy back into its empty persistentDir ---------------------------------------
 if [ -d "${MDUMP}" ] && [ -n "$(ls -A "${MDUMP}" 2>/dev/null)" ]; then
-  if [ -n "$(ls -A "${MINIO_STORE}" 2>/dev/null)" ]; then
-    log "MinIO persistentDir already populated — refusing to clobber (no-op)"
+  # "Populated" must mean REAL DATA, not merely a directory. start.sh pre-creates the bucket
+  # directory, so an `ls -A` test here would report every clone as already populated and silently
+  # skip the MinIO rebuild, losing every media and event blob on the one path that has to work.
+  if [ -d "${MINIO_STORE}/.minio.sys" ]; then
+    log "MinIO persistentDir already holds a MinIO store — refusing to clobber (no-op)"
   else
     log "restoring MinIO ${MDUMP} -> ${MINIO_STORE}"
     mkdir -p "${MINIO_STORE}"
@@ -42,17 +45,21 @@ else
 fi
 
 # ---- ClickHouse: rebuild through a transient server -----------------------------------------------
-if [ ! -d "${DUMP}" ]; then
-  log "no ClickHouse dump at ${DUMP} (fresh install) — nothing to restore"
-  exit 0
-fi
-
-# A store carrying the rebuild marker is a store whose rebuild was interrupted. Treat it as empty and
-# start again: a partially restored ClickHouse store opens happily and is simply missing data, which is
-# precisely the silent failure this package is being rebuilt to avoid.
+# The rebuild marker is checked BEFORE the dump, deliberately. A store carrying the marker is a store
+# whose rebuild was interrupted, and it is partial: booting on it means silently missing data. If the
+# dump has also gone, that is a genuine emergency and must be fatal, not a cheerful "nothing to do".
 if [ -e "${REBUILD_MARKER}" ]; then
+  if [ ! -d "${DUMP}" ]; then
+    log "FATAL: a rebuild was interrupted (marker present) but the dump at ${DUMP} is GONE."
+    log "The store is partial and there is nothing to rebuild it from. Refusing to start on it."
+    log "Restore this app from a backup that contains ${DUMP}."
+    exit 1
+  fi
   log "a previous rebuild was interrupted (marker present) — discarding the partial store and retrying"
   find "${CH_STORE}" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+elif [ ! -d "${DUMP}" ]; then
+  log "no ClickHouse dump at ${DUMP} (fresh install) — nothing to restore"
+  exit 0
 elif [ -d "${CH_STORE}/store" ] || [ -d "${CH_STORE}/metadata" ]; then
   log "ClickHouse persistentDir already populated — refusing to clobber (no-op)"
   exit 0

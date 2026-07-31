@@ -22,7 +22,7 @@ On update, the new `persistentDir` is created empty while the user's data sits a
 unused. So a one-time relocation is mandatory, and it is the single most dangerous operation in v0.2.0,
 because it happens once, on live data, with no chance to rehearse it on the install that matters.
 
-Three facts, measured on the box 2026-07-31 (`phase-notes/phase-1-findings.md`), set the constraints:
+Three facts, measured on the rig 2026-07-31 (`phase-notes/phase-1-findings.md`), set the constraints:
 
 1. **The relocation is a byte copy, always.** A `persistentDir` is bind-mounted from
    `/home/yellowtent/platformdata/persistent/<appid>/<path-with-underscores>`. It sits on the same ext4
@@ -64,22 +64,50 @@ a destination that is by then live and diverging.
 ### The sequence, per store
 
 ```
-1. If .migration-verified exists            -> the data is already safe; skip to step 7.
-2. Guard: source/store exists AND (destination is empty OR .migration-in-progress exists).
-   If the guard does not hold, there is nothing to do.
-3. Write .migration-in-progress (source path, ISO timestamp, source byte count).
-4. rsync -a --delete --exclude='/status' --exclude='/tmp/' --exclude='/shadow/' --exclude='tmp_*' \
-         <source>/ <destination>/
+1. If the source does not hold REAL DATA, there is nothing to do. "Real data" means a non-empty
+   sentinel subdirectory: store/ or metadata/ for ClickHouse, .minio.sys for MinIO. A directory
+   that merely exists never counts (see "What counts as a store" below).
+2. If .migration-cleanup-pending exists, this is our own legacy tree awaiting deletion. Skip to 7.
+3. Otherwise the source holds data and no cleanup of ours is outstanding. If the DESTINATION also
+   holds real data and we are not resuming, an operator has restored a pre-0.2.0 backup on top of a
+   0.2.0 install: discard the destination's contents and migrate the restored data in their place.
+   Announce this loudly.
+4. Write .migration-in-progress (source path, ISO timestamp, source byte count).
+5. rsync -a --delete --exclude='/status' --exclude='/tmp/' --exclude='/shadow/' --exclude='tmp_*' \
+         (plus the marker excludes) <source>/ <destination>/
    Idempotent and resumable: re-running after an interruption copies only what is missing.
    NOT mv. --delete removes anything a killed earlier pass left behind.
-5. Verify by re-running the same rsync with --dry-run --itemize-changes.
-   It must report NOTHING to transfer. Also log the byte and file counts of both trees.
-   On any transfer being reported: leave .migration-in-progress in place, refuse to start, log loudly.
-6. Write .migration-verified, remove .migration-in-progress, chown the destination.
-7. Cleanup, gated on health: only once the app has reached /api/public/health 200 does
-   `rm -rf <source>` run, logging the reclaimed bytes. If health is never reached, the legacy
-   tree is left alone and a later boot performs the cleanup, because .migration-verified persists.
+6. Verify by re-running the same rsync with --dry-run --itemize-changes.
+   It must SUCCEED and report NOTHING to transfer. Both conditions are checked: a verification
+   pass that fails to run is treated as "not verified", never as "nothing left to do".
+   Also log the byte and file counts of both trees.
+   On failure: leave .migration-in-progress in place, refuse to start, log loudly.
+7. Remove .migration-in-progress FIRST, then write .migration-verified and
+   .migration-cleanup-pending, then chown. That order matters: a crash between the two publish
+   writes must not leave a stale in-progress marker, which would suppress the step-3 branch for a
+   genuine future legacy restore.
+8. Cleanup, gated on health: only once the app has reached /api/public/health 200 does
+   `rm -rf <source>` run, logging the reclaimed bytes. If the delete does not fully succeed the
+   cleanup marker is KEPT, because a half-deleted legacy tree with no marker is exactly the input
+   that would make the next boot treat it as a restored backup.
 ```
+
+### What counts as a store, and why it is not "the directory exists"
+
+Emptiness is decided by a **non-empty sentinel subdirectory**, never by `ls -A` on the store root and
+never by the sentinel directory merely existing. Two independent failure modes force this, and both
+were found by adversarial review after the first implementation passed its tests:
+
+- **`start.sh` must not create anything inside a persistentDir before these legs run.** The first
+  implementation created the ClickHouse subdirectories and the MinIO bucket directory in section 1,
+  which made "the destination is empty" false on every boot forever. The consequence was that the
+  discard branch fired on the ordinary happy-path update, and that leg 3 silently skipped the MinIO
+  rebuild on every clone. The layout is now created in section 2c, after the legs.
+- **`rm -rf` unlinks the top directory last**, so a killed cleanup routinely leaves a bare `store/`
+  skeleton. If an empty sentinel counted as data, that skeleton would be read as a restored legacy
+  backup and would destroy a live multi-gigabyte store, silently.
+
+Both conditions are pinned by regression cases in `test/migration.sh`.
 
 **Why a dry-run rsync rather than comparing `du -sb` totals.** The plan this work derives from specified
 byte-and-count verification. That is a weaker check than it looks: totals can match while individual files
@@ -119,12 +147,24 @@ and `/app/data/minio`. On the next boot the destination is a populated `persiste
 `.migration-verified` from the earlier migration, so step 1 would skip to cleanup and **delete the restored
 legacy tree without using it**, which is wrong.
 
-**Therefore the guard in step 2 takes precedence over step 1 when the source tree is newer than the
-marker.** Concretely: if `/app/data/clickhouse/store` exists and its mtime is later than
-`.migration-verified`, treat it as a freshly restored legacy backup, clear `.migration-verified`, empty the
-destination, and migrate again. This is the only place in the design where data is deliberately discarded
-from the destination, and it is correct: an operator who restores a v0.1.0-era backup is asking for exactly
-that. Log it unmistakably.
+**The trigger is the absence of `.migration-cleanup-pending`, not an mtime comparison.** After a
+completed migration the legacy tree is deleted, so its reappearance without a pending cleanup can only
+mean a pre-0.2.0 backup has been restored. Step 3 then discards the destination and migrates the
+restored data in its place. This is the only place in the design where data is deliberately discarded
+from the destination, and it is correct: an operator who restores a v0.1.0-era backup is asking for
+exactly that. It is logged unmistakably.
+
+**Why not mtime.** The obvious rule, "treat the source as a restore when it is newer than
+`.migration-verified`", does not work: Cloudron's restore preserves mtimes, so a restored legacy tree
+routinely carries a timestamp OLDER than the marker it would have to beat. The rule would silently
+fail in exactly the case it exists for.
+
+**Known limitation, recorded rather than solved.** Nothing compares the restored legacy tree's
+recency against the dump's. If a backup was captured during the window when the legacy tree still
+existed (before the health-gated cleanup ran), restoring or cloning it presents both a legacy tree and
+a dump, and the legacy tree wins. That window is one boot on a healthy install, but it is not zero,
+and on an install that never reaches health it persists. Closing it properly needs a recency marker
+written into the legacy tree at migration time; it is not in v0.2.0.
 
 ## Deployment: publishing v0.2.0 is itself the production update
 
@@ -135,7 +175,7 @@ still carrying `versionsUrl` pointing at this repository's `CloudronVersions.jso
 combination is the default for anyone who installs from a manifest that declares a `versionsUrl`, so it is
 not a local quirk.
 
-**So the box is watching `main`, and publishing 0.2.0 to `CloudronVersions.json` deploys it to production
+**So the rig is watching `main`, and publishing 0.2.0 to `CloudronVersions.json` deploys it to production
 without any further human action.** The plan this work derives from treats publishing and deploying as
 separate steps, and on this install they are not.
 

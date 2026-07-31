@@ -23,21 +23,13 @@ log "langfuse ${VERSION} booting"
 # ------------------------------------------------------------------------------------------------
 CH_STORE=/var/lib/clickhouse
 MINIO_STORE=/var/lib/minio
-# "${MINIO_STORE}/langfuse" pre-creates the bucket exactly as v0.1.0 did at the old path.
-mkdir -p "${DATA}/.secrets" /run/langfuse \
-         "${CH_STORE}"/{logs,tmp,access,user_files,format_schemas} \
-         "${MINIO_STORE}/langfuse"
+# CRITICAL ORDERING: nothing may create anything INSIDE either persistentDir before the boot legs in
+# section 2b have run. Both the migration guard and the leg-3 rebuild decide what to do by asking
+# whether the destination is empty, so pre-creating even one subdirectory here makes "empty" untrue
+# forever: the migration would read every ordinary update as a restored legacy backup, and leg 3 would
+# skip the MinIO rebuild on every clone. The layout is created in section 2c instead, AFTER the legs.
+mkdir -p "${DATA}/.secrets" /run/langfuse
 chown -R cloudron:cloudron "${DATA}" /run/langfuse
-# Re-assert persistentDir ownership, but only walk the whole store when the top level has actually
-# drifted (a restoreCommand runs as root). Otherwise a multi-gigabyte chown -R on every single boot.
-for _store in "${CH_STORE}" "${MINIO_STORE}"; do
-  if [ "$(stat -c %U "${_store}" 2>/dev/null || echo x)" != cloudron ]; then
-    chown -R cloudron:cloudron "${_store}"
-  else
-    chown cloudron:cloudron "${_store}"
-  fi
-done
-chown cloudron:cloudron "${CH_STORE}"/{logs,tmp,access,user_files,format_schemas}
 chmod 0700 "${DATA}/.secrets"
 
 # ------------------------------------------------------------------------------------------------
@@ -88,6 +80,13 @@ run_leg() {                                   # run "$@" as a child we can signa
   local rc=0
   "$@" & _child=$!
   wait "${_child}" || rc=$?
+  if [ "${rc}" -ge 128 ]; then
+    # `wait` returns as soon as the trap fires, so wait again to let the child actually finish.
+    wait "${_child}" 2>/dev/null || true
+    _child=""
+    log "stop requested during a store operation. It is resumable and continues on the next boot."
+    exit 0                                    # an operator stop is not a failure; do not log FATAL
+  fi
   _child=""
   return "${rc}"
 }
@@ -116,6 +115,22 @@ if [ -d "${DATA}/clickhouse-backup" ] && [ -d "${CH_STORE}/store" ]; then
 fi
 
 trap - TERM INT
+
+# ------------------------------------------------------------------------------------------------
+# 2c. Store layout + ownership, AFTER the legs (see the ordering note in section 1 for why).
+#     "${MINIO_STORE}/langfuse" pre-creates the bucket exactly as v0.1.0 did at the old path.
+# ------------------------------------------------------------------------------------------------
+mkdir -p "${CH_STORE}"/{logs,tmp,access,user_files,format_schemas} "${MINIO_STORE}/langfuse"
+# Re-assert persistentDir ownership, but only walk the whole store when the top level has actually
+# drifted (a restoreCommand runs as root). Otherwise a multi-gigabyte chown -R on every single boot.
+for _store in "${CH_STORE}" "${MINIO_STORE}"; do
+  if [ "$(stat -c %U "${_store}" 2>/dev/null || echo x)" != cloudron ]; then
+    chown -R cloudron:cloudron "${_store}"
+  else
+    chown cloudron:cloudron "${_store}"
+  fi
+done
+chown cloudron:cloudron "${CH_STORE}"/{logs,tmp,access,user_files,format_schemas} "${MINIO_STORE}/langfuse"
 
 # ------------------------------------------------------------------------------------------------
 # 3. Map CLOUDRON_* addon vars -> Langfuse env (every boot; addon values can change on restart).

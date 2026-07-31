@@ -189,6 +189,40 @@ on Laminar under load / on a real server boot. In it:
 - **Cross-store skew:** measure the PG/CH/MinIO capture order under load; confirm no restored row references
   a media blob absent from the restored MinIO (ADR-0011 direction).
 
+## Decision N — the nightly upload cost, now measured rather than guessed
+
+**The syncer compares metadata, not content.** Read from the rig's own `box/src/syncer.js` on
+2026-07-31:
+
+```js
+if (entryStat.mtime.getTime() !== cacheStat.mtime || entryStat.size != cacheStat.size
+    || entryStat.inode !== cacheStat.inode) {   // file changed
+```
+
+A `sha256` integrity value is recorded per file, but it is used only to notice a *missing* integrity
+record, never to decide whether a file changed. So there is no content-addressed dedupe to lean on.
+
+**Consequence, and it is unwelcome.** `backupCommand` publishes the dump atomically via
+`.new`-then-rename. That changes every file's mtime **and** inode, so on the next run every file in
+the ClickHouse dump is classified `changed` and re-uploaded. The backup destination is a Hetzner
+Storage Box over SSH measured at **1 to 3 MB/s**, so a multi-gigabyte dump is tens of minutes added to
+this app's slot, every night, forever.
+
+This is a performance decision, not a correctness one, and it does not block v0.2.0. The options, for
+whoever picks it up:
+
+1. **ClickHouse incremental backups** (`SETTINGS base_backup=File('…')`), so each run writes only new
+   parts. This is the real fix. It costs a retention policy for the base backup chain, which is a
+   genuine design question rather than a switch.
+2. **Drop the atomic publish** so unchanged files keep their inode and mtime. Rejected: a failed or
+   killed backup would then corrupt the published dump, trading a bounded performance cost for an
+   unbounded correctness one.
+3. **Accept it.** Defensible while the store is small, and it is at least *bounded* and predictable,
+   unlike the defect being fixed.
+
+Do not treat option 1 as free before measuring: a full `BACKUP` of a MergeTree writes each part's data
+regardless, so the saving depends on how much of the store is genuinely new between runs.
+
 ## History
 
 **2026-07-31 — the `mv` migration sketch is withdrawn, and MinIO's position is reversed.**
