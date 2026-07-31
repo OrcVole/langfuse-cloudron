@@ -38,6 +38,35 @@ any useful sense: it is close to deterministic whenever the app is running and i
 
 This strengthens the case that the guard needs to cover every tree-walking pass, not just `readTree`.
 
+## A second, unrelated defect found in the same file — the inode comparison never fires
+
+Worth reporting separately, because it is an integrity issue rather than a crash.
+
+`syncer.js` decides a file has changed with:
+
+```js
+if (entryStat.mtime.getTime() !== cacheStat.mtime || entryStat.size != cacheStat.size
+    || entryStat.inode !== cacheStat.inode) { // file changed
+```
+
+and caches it with `stat: { mtime: ..., size: ..., inode: entryStat.inode, mode: ... }`.
+
+**Node's `fs.Stats` has no `inode` property; it is `ino`.** So `entryStat.inode` is `undefined`,
+`JSON.stringify` omits it from the cache entry, and the third clause evaluates
+`undefined !== undefined`, which is always false. Verified on a 9.2.0 rig:
+
+```
+$ node -e 'const s=require("fs").statSync("/etc/hostname"); console.log(s.ino, s.inode)'
+149641 undefined
+```
+
+The effective comparison is therefore **mtime and size only**. A file modified in place that keeps
+both its size and its mtime is never re-uploaded, and the backup silently retains the stale copy.
+Restores and tools that preserve mtimes make that less exotic than it sounds.
+
+Changing `inode` to `ino` would fix it, but note it would also invalidate every existing cache entry
+(all of which lack the field), so the first run afterwards would re-upload everything.
+
 **Not yet posted.** The forum thread is the canonical report and only the maintainer can update it; this
 section is the copy to be pasted, held here until then.
 
