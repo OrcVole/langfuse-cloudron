@@ -74,8 +74,19 @@ empty or partial and starts again, provided the leg treats a partially populated
 the same marker discipline, `.rebuild-in-progress` written before the transient server starts and removed
 only after a clean shutdown, and treat a `persistentDir` carrying that marker as empty.
 
-**Still to measure:** how long a rebuild actually takes against a realistic dump. That number decides
-whether anything further is needed. It is a gate-4 measurement and it must be recorded, not estimated.
+**Still to measure:** how long a rebuild actually takes against a realistic dump, and **whether it
+completes at all**. The second half of that question is sharper than it first looked. The transient
+server runs under the same absolute `max_server_memory_usage` cap of 2 GiB as the real one (ADR 0005
+sets it absolute rather than as a ratio, because it is unverified whether the bundled ClickHouse reads
+the cgroup limit or host RAM). During gate loading on a throwaway, sustained ingest drove ClickHouse
+into that ceiling hard enough that even `SELECT count() FROM traces` failed with
+`Code: 241 ... MEMORY_LIMIT_EXCEEDED`. A RESTORE of a multi-gigabyte dump has the same 2 GiB to work
+in.
+
+So the rebuild must be measured at the **largest plausible store**, not a convenient one, and the
+measurement must be recorded rather than estimated. If it turns out the cap is the binding constraint,
+the options are to raise it for the transient server only (it is a separate process with a separate
+config) or to restore in stages.
 
 ### Signal handling
 
