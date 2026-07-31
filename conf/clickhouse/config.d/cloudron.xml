@@ -1,23 +1,38 @@
 <?xml version="1.0"?>
 <!-- Cloudron overrides merged over ClickHouse's default config.xml (config.d/*.xml is auto-loaded).
-     All persistent state lives under the backed-up /app/data; logs go to stdout; bind localhost only. -->
+
+     v0.2.0 (ADR 0006): the ClickHouse store MOVED OUT of /app/data to the /var/lib/clickhouse
+     persistentDir. persistentDirs are excluded from Cloudron's filesystem backup walk, so ClickHouse's
+     constant tmp_merge_*/tmp_insert_* churn can no longer make the syncer trip and abort the whole
+     server's backup run. The data stays inside the backup surface via backupCommand/restoreCommand,
+     which dump it logically into /app/data. Existing installs are migrated once, on boot (ADR 0008).
+
+     Logs move with it: they are not backup-critical, and moving them out of the walk is a bonus.
+     Bind localhost only. -->
 <clickhouse>
-    <path>/app/data/clickhouse/</path>
-    <tmp_path>/app/data/clickhouse/tmp/</tmp_path>
-    <user_files_path>/app/data/clickhouse/user_files/</user_files_path>
-    <format_schema_path>/app/data/clickhouse/format_schemas/</format_schema_path>
+    <path>/var/lib/clickhouse/</path>
+    <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
+    <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
+    <format_schema_path>/var/lib/clickhouse/format_schemas/</format_schema_path>
     <user_directories>
         <users_xml><path>users.xml</path></users_xml>
-        <local_directory><path>/app/data/clickhouse/access/</path></local_directory>
+        <local_directory><path>/var/lib/clickhouse/access/</path></local_directory>
     </user_directories>
 
-    <!-- Default file logs go to read-only /var/log; redirect under /app/data and also echo to stdout
-         (Cloudron captures stdout/stderr). -->
+    <!-- Sandbox File backups to /app/data so the transient server used by restore-clickhouse.sh can read
+         the dump Cloudron restored there. The standalone conf/clickhouse/backups.xml carries the same
+         setting for the `clickhouse local` invocation in backup-clickhouse.sh. -->
+    <backups>
+        <allowed_path>/app/data</allowed_path>
+    </backups>
+
+    <!-- Default file logs go to read-only /var/log; redirect into the persistentDir and also echo to
+         stdout (Cloudron captures stdout/stderr). -->
     <logger>
         <console>1</console>
         <level>warning</level>
-        <log>/app/data/clickhouse/logs/clickhouse-server.log</log>
-        <errorlog>/app/data/clickhouse/logs/clickhouse-server.err.log</errorlog>
+        <log>/var/lib/clickhouse/logs/clickhouse-server.log</log>
+        <errorlog>/var/lib/clickhouse/logs/clickhouse-server.err.log</errorlog>
         <size>100M</size>
         <count>3</count>
     </logger>
