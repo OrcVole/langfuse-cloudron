@@ -223,6 +223,21 @@ whoever picks it up:
 Do not treat option 1 as free before measuring: a full `BACKUP` of a MergeTree writes each part's data
 regardless, so the saving depends on how much of the store is genuinely new between runs.
 
+**The uncomfortable part, stated plainly: on upload cost alone, v0.1.0's raw files were BETTER.**
+MergeTree parts are immutable and uniquely named. A merge adds new part files and removes old ones,
+but it never rewrites a file in place, so a raw-files backup presents the syncer with exactly the
+input its mtime-size-inode comparison handles well: most files are byte-for-byte unchanged with
+unchanged metadata, and only genuinely new parts upload. Observed while taking a v0.1.0-era backup of
+a throwaway during this work: the walk enumerated 9 739 files, and on a second run the great majority
+would be skipped.
+
+Version 0.2.0 replaces that with a single atomically-republished dump, every file of which looks new
+every night. **So the relocation trades nightly upload cost for correctness.** That trade is still
+plainly worth making, because the cost being removed is "this app aborts the whole rig's backup run
+and every application scheduled after it silently keeps a stale backup", and the cost being added is
+minutes of upload. But it should be recorded as a real trade rather than presented as a pure win, and
+it is the strongest argument for pursuing option 1 once v0.2.0 is stable.
+
 ## History
 
 **2026-07-31 — the `mv` migration sketch is withdrawn, and MinIO's position is reversed.**
