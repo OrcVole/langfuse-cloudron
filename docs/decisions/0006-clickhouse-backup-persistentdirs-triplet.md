@@ -202,28 +202,50 @@ if (entryStat.mtime.getTime() !== cacheStat.mtime || entryStat.size != cacheStat
 A `sha256` integrity value is recorded per file, but it is used only to notice a *missing* integrity
 record, never to decide whether a file changed. So there is no content-addressed dedupe to lean on.
 
-**Consequence, and it is unwelcome.** `backupCommand` publishes the dump atomically via
-`.new`-then-rename. That changes every file's mtime **and** inode, so on the next run every file in
-the ClickHouse dump is classified `changed` and re-uploaded. The backup destination is a Hetzner
-Storage Box over SSH measured at **1 to 3 MB/s**, so a multi-gigabyte dump is tens of minutes added to
-this app's slot, every night, forever.
+**The inode half of that comparison is dead code, and that changes the answer.** Node's `fs.Stats`
+exposes `ino`, not `inode`, so `entryStat.inode` is `undefined`. The cache writes
+`inode: entryStat.inode`, `JSON.stringify` drops undefined values, and the comparison therefore
+evaluates `undefined !== undefined`, which is always false. Verified on the rig:
+`node -e 'const s=require("fs").statSync("/etc/hostname"); console.log(s.ino, s.inode)'` prints
+`149641 undefined`. **In practice the syncer compares mtime and size only.**
 
-This is a performance decision, not a correctness one, and it does not block v0.2.0. The options, for
-whoever picks it up:
+**Measured consequence, and it is the opposite of what this ADR first predicted.** Because `rsync -a`
+preserves mtime and size, the `.new`-then-rename publish does NOT defeat the incremental logic: the
+republished files look unchanged despite every one of them being a new inode. Two consecutive backups
+of the same throwaway, through Cloudron's own `backup create`, with no data changed in between:
 
-1. **ClickHouse incremental backups** (`SETTINGS base_backup=File('…')`), so each run writes only new
-   parts. This is the real fix. It costs a retention policy for the base backup chain, which is a
-   genuine design question rather than a switch.
-2. **Drop the atomic publish** so unchanged files keep their inode and mtime. Rejected: a failed or
-   killed backup would then corrupt the published dump, trading a bounded performance cost for an
-   unbounded correctness one.
-3. **Accept it.** Defensible while the store is small, and it is at least *bounded* and predictable,
-   unlike the defect being fixed.
+| Backup | Files walked | Duration |
+|---|---|---|
+| v0.2.0, first (full upload) | 6 074 | **1 139 s** |
+| v0.2.0, second (nothing changed) | 6 074 | **93 s**, with no upload lines logged at all |
+
+So the nightly steady-state cost is small. What does re-upload each night is the ClickHouse dump
+itself, because `clickhouse local` writes those files fresh and they genuinely carry new mtimes, but
+that is roughly 44 files rather than the 221 865 a raw-file store presents.
+
+**Decision N is therefore closed as a non-problem for v0.2.0.** Incremental ClickHouse backups
+(`SETTINGS base_backup=File('…')`) remain available if the dump ever grows enough to matter, but they
+are not needed now and they would cost a retention policy for the base-backup chain. Do not drop the
+atomic publish to chase upload cost: a failed or killed backup would then corrupt the published dump,
+trading a bounded and now-measured performance cost for an unbounded correctness one.
+
+**One caveat worth carrying, because it is a platform-side hazard rather than ours.** A dead inode
+check means a file that is modified in place, keeping both its size and its mtime, is invisible to the
+backup. That is narrow, but it is a genuine integrity gap in the platform and it has been added to the
+upstream report alongside the `readTree` crash.
 
 Do not treat option 1 as free before measuring: a full `BACKUP` of a MergeTree writes each part's data
 regardless, so the saving depends on how much of the store is genuinely new between runs.
 
-**The uncomfortable part, stated plainly: on upload cost alone, v0.1.0's raw files were BETTER.**
+**WITHDRAWN 2026-08-01, by measurement.** The paragraph below argued that v0.1.0's raw files were
+cheaper to upload than v0.2.0's dump. That was reasoned from immutability and it is wrong in both
+halves. On first-backup cost the dump is cheaper (1 139 s against 1 180 s here, and far more so at
+production's 221 865 files, since per-file latency dominates at about 8.5 files/second). On
+steady-state cost the dump is also cheap, because the inode comparison is dead code and `rsync -a`
+preserves mtime and size, so a republished tree reads as unchanged. Kept visible rather than deleted,
+because the reasoning was plausible and someone will otherwise re-derive it.
+
+~~**The uncomfortable part, stated plainly: on upload cost alone, v0.1.0's raw files were BETTER.**~~
 MergeTree parts are immutable and uniquely named. A merge adds new part files and removes old ones,
 but it never rewrites a file in place, so a raw-files backup presents the syncer with exactly the
 input its mtime-size-inode comparison handles well: most files are byte-for-byte unchanged with
