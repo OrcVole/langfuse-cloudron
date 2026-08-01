@@ -56,4 +56,29 @@
          RAM; a ratio against misread host RAM could OOM-kill the container (AGENTS.md, ADR memory note). -->
     <max_server_memory_usage>2147483648</max_server_memory_usage>
     <mark_cache_size>536870912</mark_cache_size>
+
+    <!-- v0.2.1 (ADR 0011): bound ClickHouse's own telemetry tables. Left on defaults they grow without
+         limit and dominate the store: a five-week idle production install held 19.7 kB of application
+         data against 176 million system-log rows in 3.9 GB, whose parts metadata alone pinned tracked
+         memory above the cap (every aggregating query then fails) and whose background merges burned
+         4.5 to 7.8 cores continuously. Element set verified against THIS image's ClickHouse 25.3 via
+         system.tables, because the set differs across versions and a wrong element name fails silently
+         (25.3 has latency_log and opentelemetry_span_log; it lacks 25.12's background_schedule_pool_log).
+         query_log and error_log are kept, TTL-bounded, because they are the two an operator actually
+         reads when debugging. NOTE for updates of existing installs: adding a TTL makes ClickHouse
+         rename the old table to <name>_0 and start fresh; the one-time DROP of removed tables and the
+         _0 renames is a deliberate operator step (docs/KNOWN-ISSUES.md), done together with the deploy,
+         never deferred. Prior art: the sibling Laminar package, its ADR 0012. -->
+    <trace_log remove="1"/>
+    <text_log remove="1"/>
+    <part_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <query_metric_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <asynchronous_insert_log remove="1"/>
+    <latency_log remove="1"/>
+    <opentelemetry_span_log remove="1"/>
+    <query_log><ttl>event_date + INTERVAL 3 DAY DELETE</ttl></query_log>
+    <error_log><ttl>event_date + INTERVAL 3 DAY DELETE</ttl></error_log>
 </clickhouse>

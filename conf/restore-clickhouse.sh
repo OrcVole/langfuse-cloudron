@@ -5,10 +5,12 @@
 # IT IS CALLED FROM TWO PLACES, deliberately:
 #   1. Cloudron's restoreCommand, in a temporary container before the app starts.
 #   2. start.sh, on every boot, as leg 3.
-# The second is the one that carries the load. A restoreCommand cannot tell an in-place restore from an
-# ordinary restart and does not run at all on a plain boot, whereas the only operation that leaves a
-# persistentDir EMPTY is a clone. So the boot path is what actually rebuilds a cloned install, and this
-# script is written to be idempotent and to no-op loudly when there is nothing to do.
+# On a CLONE both fire, in that order, and it is the restoreCommand that actually rebuilds (measured on
+# the rig: by the time leg 3 ran, both stores were populated and it no-opped). The boot leg still
+# carries real weight: no restoreCommand runs on a plain boot, so it alone serves the KNOWN-ISSUES
+# recipe (empty the store, restart, rebuild from the dump) and backstops a skipped or dead
+# restoreCommand. The pair is only safe because this script is idempotent, no-ops loudly, and tests
+# for a real store sentinel rather than a non-empty directory. See ADR 0009's correction note.
 #
 # CRITICAL (ADR 0006/0009): the dump MUST be restored through a real clickhouse-SERVER, never
 # `clickhouse local`. A `clickhouse local` RESTORE omits the implicit `default` database metadata and
