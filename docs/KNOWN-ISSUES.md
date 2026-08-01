@@ -16,6 +16,31 @@ walk, which is what stops this app aborting your whole server's backup run.
 rebuilds ClickHouse from the dump and gives you exactly the data in that backup. If what you want is a
 point-in-time copy to look at, clone rather than restore.
 
+### Restoring a backup from before v0.2.0 takes the app back to v0.1.0
+
+Cloudron restores an app's *manifest* along with its data, so if you restore a backup that was taken
+while this app was on v0.1.0, the app goes back to running v0.1.0. That is normal and the data is
+correct, but one consequence is alarming if you are not expecting it.
+
+**`/var/lib/clickhouse` will look empty from inside the app, and your data is not gone.** The v0.1.0
+manifest declares no `persistentDirs`, so Cloudron simply stops mounting them; what the container shows
+you is an empty directory from the image. The real store is still on the host, untouched, and it comes
+back the moment a manifest that declares it is applied again. **Do not try to "clean up" that apparently
+empty directory**, and do not conclude the migration destroyed anything.
+
+When you next update to v0.2.0, the app finds the restored v0.1.0 data in `/app/data` alongside that
+older store, and it says so in the boot log before doing anything:
+
+```
+==> [migrate] clickhouse: legacy data at /app/data/clickhouse while /var/lib/clickhouse is already populated
+==> [migrate] clickhouse: ... DISCARDING the current contents of /var/lib/clickhouse
+==> [migrate] clickhouse: and migrating the restored data in their place.
+```
+
+That is deliberate, not a bug: you restored that backup because you wanted its data, so the restored
+data wins and the older store is discarded. The migration then verifies the copy and only deletes the
+legacy tree once the app has actually served traffic. This path is gate-tested end to end.
+
 ### Recipe: making an in-place restore actually restore ClickHouse
 
 1. Perform the in-place restore as normal and let the app come up.
