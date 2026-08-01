@@ -7,7 +7,10 @@ docs/*.local.md
 
 # --- Per-phase handoff / working notes (local-only, never published) ---
 phase-notes/
-langfuse-backup-fix-foundation.md
+# Glob, not a fixed filename: these name the box and its hostnames, and a second
+# foundation doc (langfuse-clickhouse-resource-foundation.md) landed here untracked
+# but UNignored, one `git add .` from publishing host specifics.
+*foundation*.md
 
 # --- Local-only reference docs (cross-package maintainer playbook) ---
 cloudron-packaging-field-guide-*.md
