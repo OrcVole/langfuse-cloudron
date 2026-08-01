@@ -3,6 +3,18 @@
 All notable changes to this package. The community versions channel parses the bracket headings
 (`[0.1.0]`) literally, so keep that format.
 
+## [0.2.1]
+
+* Bounds ClickHouse's own telemetry tables, which previously grew without limit. On a five-week idle
+  install they had reached 176 million rows and 3.9 GB against 19.7 kB of application data, starved
+  every analytics query of memory (dashboards erroring while the app reported healthy), and burned
+  several CPU cores continuously on background merges. Ten internal log tables are now disabled;
+  `query_log` and `error_log` are kept with a three-day retention.
+* **Updating an existing install needs a one-time cleanup**, done together with the update rather
+  than deferred: the removed tables' data is not reclaimed by disabling them, and the two kept tables
+  are renamed to `query_log_0`/`error_log_0` when the retention is added. See `docs/KNOWN-ISSUES.md`
+  for the exact statements. A fresh install needs nothing.
+
 ## [0.2.0]
 
 * Fixes a defect where this app could abort the **whole server's** backup run. The bundled ClickHouse

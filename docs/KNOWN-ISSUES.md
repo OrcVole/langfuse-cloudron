@@ -24,18 +24,30 @@ Three consequences:
    The sibling Laminar package measured the same mechanism (~24 new `trace_log` parts per minute) and
    its container dropped from ~330 % CPU to ~45 % when the log tables were removed.
 
-**Interim recipe.** In the app's terminal, truncate the log tables (they are diagnostics, not
-application data; truncation is DDL and works even when queries are starving):
+**Fixed in v0.2.1** ([ADR 0011](decisions/0011-clickhouse-system-log-bounds.md)): ten internal log
+tables are disabled outright and the two an operator actually reads, `query_log` and `error_log`, are
+kept with a three-day retention. A fresh v0.2.1 install needs nothing further.
+
+**Updating an existing install needs a one-time cleanup, done together with the update, not later.**
+Disabling a table does not reclaim its data, and on the first boot with the new configuration the
+server re-opens the old parts and merges them, which can hold the app's memory cap and make it look
+unhealthy for minutes. Adding the retention also renames the old `query_log`/`error_log` to
+`query_log_0`/`error_log_0` rather than trimming them. Immediately after the update, in the app's
+terminal (DDL works even while queries are starving):
 
 ```
-clickhouse-client --user clickhouse --password "$CLICKHOUSE_PASSWORD" \
-  --query "TRUNCATE TABLE system.query_log; TRUNCATE TABLE system.part_log; TRUNCATE TABLE system.metric_log; TRUNCATE TABLE system.trace_log; TRUNCATE TABLE system.asynchronous_metric_log; TRUNCATE TABLE system.text_log"
+clickhouse-client --user clickhouse --password "$CLICKHOUSE_PASSWORD" --query "
+  DROP TABLE IF EXISTS system.trace_log SYNC; DROP TABLE IF EXISTS system.text_log SYNC;
+  DROP TABLE IF EXISTS system.part_log SYNC; DROP TABLE IF EXISTS system.metric_log SYNC;
+  DROP TABLE IF EXISTS system.asynchronous_metric_log SYNC; DROP TABLE IF EXISTS system.query_metric_log SYNC;
+  DROP TABLE IF EXISTS system.processors_profile_log SYNC; DROP TABLE IF EXISTS system.asynchronous_insert_log SYNC;
+  DROP TABLE IF EXISTS system.latency_log SYNC; DROP TABLE IF EXISTS system.opentelemetry_span_log SYNC;
+  DROP TABLE IF EXISTS system.query_log_0 SYNC; DROP TABLE IF EXISTS system.error_log_0 SYNC"
 ```
 
-(Tables that do not exist on your version can be dropped from the list.)
-
-**Permanent fix.** Planned for v0.2.1: TTL and size caps on the system log tables in the packaged
-ClickHouse configuration, so the store stays proportional to the application data it actually holds.
+**Interim recipe for installs still on v0.2.0 or earlier**: the same statements with `TRUNCATE TABLE`
+in place of `DROP TABLE IF EXISTS ... SYNC` (the tables are live on those versions and will regrow,
+but slowly; truncation buys weeks).
 
 ## An in-place restore does not roll ClickHouse back (v0.2.0 onwards)
 
