@@ -8,7 +8,7 @@ configure a TTL for those tables, so they grow for as long as the app runs. Meas
 install after five weeks of essentially idle uptime: the application's data was **19.7 kB** while the
 `system` database had accumulated **176 million rows and 4.1 GB across roughly 222 000 files**.
 
-Two consequences:
+Three consequences:
 
 1. **Backups carry it.** The store the migration moves and the `backupCommand` snapshots is dominated
    by logs about the server itself. (The logical dump is unaffected — it exports only the application
@@ -18,6 +18,11 @@ Two consequences:
    aggregating query fails with `MEMORY_LIMIT_EXCEEDED`** — in the Langfuse UI that surfaces as
    dashboards and analytics erroring while the app otherwise looks healthy. A restart does not durably
    clear it, because the server reloads the same parts metadata at boot.
+3. **It burns CPU continuously.** The log tables are written and merged all the time, so the cost is
+   not only disk. Measured on the same idle production install: `clickhouse-server` running at **4.5
+   to 7.8 cores** — the largest single consumer on its host — with the app serving no traffic at all.
+   The sibling Laminar package measured the same mechanism (~24 new `trace_log` parts per minute) and
+   its container dropped from ~330 % CPU to ~45 % when the log tables were removed.
 
 **Interim recipe.** In the app's terminal, truncate the log tables (they are diagnostics, not
 application data; truncation is DDL and works even when queries are starving):
