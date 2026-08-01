@@ -42,6 +42,35 @@ start.
 in-place restore preserves it, so a gate that only tests backup and in-place restore will pass while this
 leg is broken. It is therefore a first-class gate item, not an afterthought.
 
+#### Correction, 2026-08-01, by measurement: on a clone it is the `restoreCommand` that rebuilds, not leg 3
+
+This ADR says above that the boot tree "is the belt that carries the load", and `restore-clickhouse.sh`
+carries a comment saying the boot path "is what actually rebuilds a cloned install". **The clone gate
+refutes that specific claim.** Cloning a v0.2.0 install produced this boot log:
+
+```
+==> [restore] MinIO persistentDir already holds a MinIO store — refusing to clobber (no-op)
+==> [restore] ClickHouse persistentDir already populated — refusing to clobber (no-op)
+```
+
+Cloudron ran the declared `restoreCommand` in its temporary container first, and that is what did the
+rebuild, in 33.9 seconds; by the time `start.sh` reached leg 3 there was nothing left to do. The data
+was verified identical to the source by content fingerprint, so the rebuild itself is not in question,
+only which of the two paths performed it.
+
+**The boot leg is not thereby redundant, and must stay.** It is what makes the operator recipe in
+`docs/KNOWN-ISSUES.md` work at all: emptying `/var/lib/clickhouse` and restarting is a plain boot, and
+no `restoreCommand` runs on a plain boot. It is also the safety net if a `restoreCommand` is skipped or
+dies part-way. The accurate statement is that the two are complementary, that **both fire on a clone in
+a fixed order**, and that the whole arrangement is only safe because the script is idempotent and tests
+for a real store sentinel rather than a non-empty directory. Had it used a bare `ls -A`, the boot leg
+would have found the layout `start.sh` pre-creates and taken the wrong branch on every clone.
+
+The stale comment inside `conf/restore-clickhouse.sh` is deliberately **not** being edited yet: the
+gates were run against a published image whose scripts were verified byte-for-byte against this tree,
+and a comment-only edit would break that correspondence for no functional gain. Correct it in the next
+image build.
+
 Two constraints, both proven on Laminar and both counter-intuitive:
 
 - **Restore through a transient `clickhouse-server`, never `clickhouse local`.** A `clickhouse local`
