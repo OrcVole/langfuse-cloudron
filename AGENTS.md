@@ -46,7 +46,19 @@ check, gotcha 31 → see ADR 0003).
    tokens, no internal hostnames in any **tracked** file. Use `example.com` placeholders in public
    docs. `test/secret-scan.sh` is the release gate. Box-specific notes stay gitignored.
 9. **Git hygiene.** No AI co-authorship or tool-attribution trailers in commits or files. Author
-   commits as the maintainer's git identity.
+   commits as the maintainer's git identity. **Every push goes to BOTH remotes** — `origin` (GitHub,
+   which serves the live `CloudronVersions.json` feed) and `forgejo` (the private mirror) — in the
+   same sitting, never one without the other.
+10. **Bound bundled engines' self-telemetry from day one.** A bundled database's internal logging
+   (ClickHouse system tables here) grows without limit unless configured, and on this package it
+   reached 176 million rows against 19.7 kB of application data, starved every analytics query, and
+   burned multiple cores continuously (ADR 0011). Any future bundled engine gets its telemetry
+   TTL-bounded or disabled in the same commit that introduces it.
+11. **Publishing to the versions feed IS deploying.** Installs watch `CloudronVersions.json` on
+   GitHub `main` with automatic updates on. A version entry is only pushed AFTER that exact digest has
+   been deployed and verified on production, together with any one-time operational step its upgrade
+   needs (0.2.1's DROP cleanup being the type specimen — an unattended config-only update without its
+   cleanup is a measured outage).
 
 ## Locked decisions (Phase 0, operator-confirmed 2026-06-26)
 
