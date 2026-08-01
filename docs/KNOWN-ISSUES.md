@@ -1,5 +1,37 @@
 # Known issues
 
+## ClickHouse's own system logs grow without bound, and can starve queries (all versions)
+
+**What it is.** The bundled ClickHouse writes its internal telemetry (`system.query_log`,
+`system.part_log`, `system.metric_log` and friends) into its own store, and this package does not
+configure a TTL for those tables, so they grow for as long as the app runs. Measured on a production
+install after five weeks of essentially idle uptime: the application's data was **19.7 kB** while the
+`system` database had accumulated **176 million rows and 4.1 GB across roughly 222 000 files**.
+
+Two consequences:
+
+1. **Backups carry it.** The store the migration moves and the `backupCommand` snapshots is dominated
+   by logs about the server itself. (The logical dump is unaffected — it exports only the application
+   database — but the transient snapshot copy inside each backup pays the full weight.)
+2. **Queries can starve.** ClickHouse's tracked memory can sit above this package's absolute 2 GiB cap
+   (ADR 0005) once the parts metadata for those log tables is large enough, at which point **every
+   aggregating query fails with `MEMORY_LIMIT_EXCEEDED`** — in the Langfuse UI that surfaces as
+   dashboards and analytics erroring while the app otherwise looks healthy. A restart does not durably
+   clear it, because the server reloads the same parts metadata at boot.
+
+**Interim recipe.** In the app's terminal, truncate the log tables (they are diagnostics, not
+application data; truncation is DDL and works even when queries are starving):
+
+```
+clickhouse-client --user clickhouse --password "$CLICKHOUSE_PASSWORD" \
+  --query "TRUNCATE TABLE system.query_log; TRUNCATE TABLE system.part_log; TRUNCATE TABLE system.metric_log; TRUNCATE TABLE system.trace_log; TRUNCATE TABLE system.asynchronous_metric_log; TRUNCATE TABLE system.text_log"
+```
+
+(Tables that do not exist on your version can be dropped from the list.)
+
+**Permanent fix.** Planned for v0.2.1: TTL and size caps on the system log tables in the packaged
+ClickHouse configuration, so the store stays proportional to the application data it actually holds.
+
 ## An in-place restore does not roll ClickHouse back (v0.2.0 onwards)
 
 **What it is.** From v0.2.0 the ClickHouse and MinIO stores live in Cloudron `persistentDirs`, and
