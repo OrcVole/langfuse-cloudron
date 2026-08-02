@@ -3,7 +3,7 @@
 All notable changes to this package. The community versions channel parses the bracket headings
 (`[0.1.0]`) literally, so keep that format.
 
-## [0.3.0]
+[0.3.0]
 
 * **Langfuse v3.199.0 to v4.2.0 (major), and bundled ClickHouse 25.3 to 26.4** (langfuse v4's
   recommended version; v4 requires at least 25.12). The ClickHouse store upgrades its on-disk
@@ -27,7 +27,7 @@ All notable changes to this package. The community versions channel parses the b
   768 MB Node heap (it fails at boot); it now gets 1536 MB, and the app's total limit moves up
   with it. Existing installs pick the new limit up automatically on update.
 
-## [0.2.1]
+[0.2.1]
 
 * Bounds ClickHouse's own telemetry tables, which previously grew without limit. On a five-week idle
   install they had reached 176 million rows and 3.9 GB against 19.7 kB of application data, starved
@@ -39,7 +39,7 @@ All notable changes to this package. The community versions channel parses the b
   are renamed to `query_log_0`/`error_log_0` when the retention is added. See `docs/KNOWN-ISSUES.md`
   for the exact statements. A fresh install needs nothing.
 
-## [0.2.0]
+[0.2.0]
 
 * Fixes a defect where this app could abort the **whole server's** backup run. The bundled ClickHouse
   and MinIO stores move out of `/app/data` into `persistentDirs`, which are excluded from Cloudron's
@@ -57,7 +57,7 @@ All notable changes to this package. The community versions channel parses the b
 * Restores of pre-0.2.0 backups onto 0.2.0 are supported: the migration recognises the restored legacy
   data and relocates it.
 
-## [0.1.0]
+[0.1.0]
 
 * Initial Cloudron package of Langfuse v3.199.0 (open-source / MIT).
 * Four-process topology under Supervisor: ClickHouse + MinIO bundled; langfuse-web + langfuse-worker.
