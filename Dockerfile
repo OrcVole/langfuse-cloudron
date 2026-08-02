@@ -17,12 +17,16 @@
 #   (node-musl -> /lib/ld-musl-x86_64.so.1; everything glibc -> /lib64/ld-linux-x86-64.so.2), and the
 #   musl loader is pointed at /opt/musl/lib ONLY (see step 1c), so the two libc worlds never cross.
 
-ARG LANGFUSE_VERSION=3.199.0
+ARG LANGFUSE_VERSION=4.2.0
 
-# ----- pinned upstream sources (digests verified 2026-06-26) -------------------------------------
-FROM docker.io/langfuse/langfuse:3.199.0@sha256:21d2596b364b63f880e5e0f53153719dd85562451f05cc406c6c4a9b0f5e2b01        AS lfweb
-FROM docker.io/langfuse/langfuse-worker:3.199.0@sha256:8999216f0e18f445bb19195423aa7dbb58e64114c3c4d4c8fe27856994169130 AS lfworker
-FROM docker.io/clickhouse/clickhouse-server:25.3@sha256:b627d7a9bc0e0c1bac26cdbe9d2fc6316faa29c5d8a174f28f5abd57d0fa6ba2 AS clickhouse
+# ----- pinned upstream sources (digests verified 2026-08-02) -------------------------------------
+# v4.2.0 web/worker images come from ghcr.io: upstream's Docker Hub push for 4.2.0 never happened
+# (Hub tops out at 4.1.0 as of 2026-08-02) while ghcr.io carries 4.2.0 under the langfuse org.
+# ClickHouse 26.4 is langfuse v4's RECOMMENDED version (25.12 is the floor); digest is the 26.4
+# multi-arch list digest for 26.4.5.143 from Docker Hub.
+FROM ghcr.io/langfuse/langfuse:4.2.0@sha256:f761e185fb018f4899078958f70c786dde98b8c62a527d73fbd54ab38aa4b89d            AS lfweb
+FROM ghcr.io/langfuse/langfuse-worker:4.2.0@sha256:b83bcc9c5503759408a3e279209ba69ea2e84c58d8cbf78ba00efd7c95e9cdf1     AS lfworker
+FROM docker.io/clickhouse/clickhouse-server:26.4@sha256:ab3f33278b99576ea2ff2b0fa316b5e078c8b25f8ba08956cdbbb67d85c8b30f AS clickhouse
 FROM docker.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e                      AS minio
 FROM docker.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727                         AS mc
 
@@ -131,6 +135,6 @@ LABEL org.opencontainers.image.title="Langfuse for Cloudron" \
       org.opencontainers.image.description="Open-source Langfuse (LLM observability) packaged for Cloudron" \
       org.opencontainers.image.source="https://github.com/OrcVole/langfuse-cloudron" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="0.2.0"
+      org.opencontainers.image.version="0.3.0"
 
 CMD [ "/app/code/start.sh" ]

@@ -49,6 +49,19 @@ clickhouse-client --user clickhouse --password "$CLICKHOUSE_PASSWORD" --query "
 in place of `DROP TABLE IF EXISTS ... SYNC` (the tables are live on those versions and will regrow,
 but slowly; truncation buys weeks).
 
+**Updating v0.2.1 to v0.3.0 leaves a much smaller version of the same residue.** ClickHouse 26.4
+serialises the `query_log`/`error_log` definitions differently, so the TTL rename fires again, and
+any install that ever ran a restore or clone carries a `backup_log` from the transient rebuild
+server (26.4 disables it in this package's config, which stops the writes but keeps the table).
+Measured on the update gate: a few dozen KB, not the gigabytes of the 0.2.1 cleanup, so this is
+tidiness rather than urgency. Optional one-time cleanup, in the app's terminal:
+
+```
+clickhouse-client --user clickhouse --password "$CLICKHOUSE_PASSWORD" --query "
+  DROP TABLE IF EXISTS system.query_log_0 SYNC; DROP TABLE IF EXISTS system.error_log_0 SYNC;
+  DROP TABLE IF EXISTS system.backup_log SYNC"
+```
+
 ## An in-place restore does not roll ClickHouse back (v0.2.0 onwards)
 
 **What it is.** From v0.2.0 the ClickHouse and MinIO stores live in Cloudron `persistentDirs`, and

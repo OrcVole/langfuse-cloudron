@@ -18,7 +18,11 @@ cd /app/code/web
 # Next.js standalone binds $HOSTNAME; Docker/Cloudron set it to the container id (gotcha 4) -> force 0.0.0.0.
 export HOSTNAME="0.0.0.0"
 export PORT="3000"
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=768}"
+# v0.3.0: 768 MB was enough for every v3 web but langfuse v4's web OOMs AT BOOT under it (FATAL
+# "Ineffective mark-compacts near heap limit", SIGABRT crash-loop, caught by test/ingest.sh before
+# it ever reached a box). 1536 MB boots and serves with headroom; memoryLimit moved 5 -> 6 GiB in
+# the same change (ADR 0005's "re-measure if a future Langfuse changes the footprint" clause).
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}"
 
 wait_for "clickhouse" curl -sf http://localhost:8123/ping
 wait_for "minio"      curl -sf http://localhost:9100/minio/health/live

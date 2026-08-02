@@ -153,6 +153,24 @@ export CLICKHOUSE_CLUSTER_ENABLED="false"
 export TELEMETRY_ENABLED="false"
 export NEXT_TELEMETRY_DISABLED="1"
 
+# ------------------------------------------------------------------------------------------------
+# 3b. Langfuse v4 migration posture (v0.3.0). The v4 code DEFAULTS are events_only + direct, which
+#     REJECT ingestion from Python SDK <=2 / JS SDK <=3 and route native OTel writes to tables the
+#     default read path does not serve. Existing installs upgraded from v3 have consumers of unknown
+#     vintage, so this package pins the upstream-documented safe posture instead:
+#       dual        - writes go to BOTH the v3 tables and the new v4 events tables; every v3 surface
+#                     (old SDKs, legacy ingestion, legacy read APIs) keeps working
+#       dual_write  - native OTel ingestion also lands in both worlds (direct+legacy would be a
+#                     hard startup error upstream; direct+dual would hide OTel data from v3 reads)
+#     The historic backfill (upstream default: enabled) rewrites pre-v4 rows into the new events
+#     tables in the background; it needs roughly 3x the ClickHouse data volume free, which our
+#     installs clear by orders of magnitude (137 MB store, 637 GB free, measured 2026-08-02).
+#     The eventual cutover to events_only is an OPERATOR decision per install (after their SDK
+#     inventory), made via /app/data/env.sh below, not by a package release.
+# ------------------------------------------------------------------------------------------------
+export LANGFUSE_MIGRATION_V4_WRITE_MODE="${LANGFUSE_MIGRATION_V4_WRITE_MODE:-dual}"
+export LANGFUSE_MIGRATION_V4_NATIVE_OTEL_BEHAVIOUR="${LANGFUSE_MIGRATION_V4_NATIVE_OTEL_BEHAVIOUR:-dual_write}"
+
 # S3 -> bundled MinIO. Event uploads are server-side (internal endpoint). Media external endpoint must be
 # browser-reachable — resolved in ADR 0004 (Phase 2.6/3); for now points at the internal endpoint.
 _s3_common() { # $1 = LANGFUSE_S3_<KIND>_UPLOAD
@@ -188,6 +206,23 @@ fi
 
 # Make the generated/bundled-service secrets visible to the supervised children.
 export CLICKHOUSE_PASSWORD MINIO_ROOT_USER MINIO_ROOT_PASSWORD NEXTAUTH_SECRET SALT ENCRYPTION_KEY
+
+# ------------------------------------------------------------------------------------------------
+# 3c. Operator env overrides, sourced LAST so they can override any package default above (the v4
+#     write-mode cutover in section 3b is the expected use). Created empty on first boot so it is
+#     discoverable in the file manager.
+# ------------------------------------------------------------------------------------------------
+if [[ ! -f "${DATA}/env.sh" ]]; then
+  cat > "${DATA}/env.sh" <<'EOF'
+# Optional operator overrides, sourced by start.sh on every boot (after all package defaults).
+# Example (v4 cutover, ONLY once every SDK/integration pointing here is v4-compatible):
+#   export LANGFUSE_MIGRATION_V4_WRITE_MODE=events_only
+#   export LANGFUSE_MIGRATION_V4_NATIVE_OTEL_BEHAVIOUR=direct
+EOF
+  chown cloudron:cloudron "${DATA}/env.sh"
+fi
+# shellcheck disable=SC1091
+source "${DATA}/env.sh"
 
 log "origin ${NEXTAUTH_URL}  encryption_key present  pg set  redis ${REDIS_HOST}:${REDIS_PORT}"
 
