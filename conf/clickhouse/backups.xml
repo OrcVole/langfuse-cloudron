@@ -3,18 +3,17 @@
      ONLY by backup-clickhouse.sh in the temporary backup container, where the server config is not in
      play. The same allowed_path is set for the real server in config.d/cloudron.xml.
 
-     default_database is NOT cosmetic. Langfuse's ClickHouse migrations create the `default` database
-     explicitly, so the store carries metadata/default.sql. `clickhouse local` also creates its own
-     implicit `default`, and loading the snapshot then fails with
-     `Code: 82 ... Database default already exists ... (DATABASE_ALREADY_EXISTS)`, so no dump is ever
-     produced. Renaming the implicit database out of the way lets the store's own `default` load
-     intact, with its definition and UUID preserved, and makes `BACKUP DATABASE default` unambiguously
-     mean the store's database. (The sibling Laminar package never hit this: its schema does not
-     materialise metadata/default.sql, so there was nothing to collide with.)
-
-     The alternative (deleting metadata/default.sql from the snapshot) also works, but it discards the
-     real database definition and backs up whatever clickhouse-local's own `default` adopted, which is
-     a less faithful dump. Keep this approach.
+     HISTORY, because this file has now flipped once per ClickHouse major and will be suspected first
+     next time. Langfuse's migrations create the `default` database explicitly, so the store carries
+     metadata/default.sql. On ClickHouse 25.3, `clickhouse local` also created its own implicit
+     `default` eagerly, loading the snapshot then failed with Code 82 DATABASE_ALREADY_EXISTS, and the
+     fix was a `default_database` override renaming the implicit database out of the way (field guide
+     gotcha 108). On 26.4 that override is itself the failure: with it set, loading the store dies with
+     Code 57 TABLE_ALREADY_EXISTS, a table-UUID mapping collision while loading `default` from
+     metadata/default.sql; without it, 26.4 loads the explicit `default` cleanly and BACKUP succeeds.
+     Reproduced both ways on a minimal one-table store against this image's exact binary, 2026-08-02.
+     If a future ClickHouse bump breaks this file again, test BOTH configurations on a store carrying
+     metadata/default.sql before reaching for anything cleverer.
 
      NOTE: a double hyphen is illegal inside an XML comment and makes ClickHouse fail to start with a
      SAXParseException, so keep prose here free of them. -->
@@ -22,5 +21,4 @@
     <backups>
         <allowed_path>/app/data</allowed_path>
     </backups>
-    <default_database>_lf_local</default_database>
 </clickhouse>

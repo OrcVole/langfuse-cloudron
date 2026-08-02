@@ -3,6 +3,30 @@
 All notable changes to this package. The community versions channel parses the bracket headings
 (`[0.1.0]`) literally, so keep that format.
 
+## [0.3.0]
+
+* **Langfuse v3.199.0 to v4.2.0 (major), and bundled ClickHouse 25.3 to 26.4** (langfuse v4's
+  recommended version; v4 requires at least 25.12). The ClickHouse store upgrades its on-disk
+  format in place on first boot; the v4 schema migrations then create the new `events` tables
+  automatically. Nothing to do on update, but take it deliberately, just after a known-good backup.
+* **All v3 API and SDK surfaces keep working.** This package pins langfuse's migration write mode
+  to `dual` (writes go to both the v3 tables and the new v4 events tables), so old SDKs, the legacy
+  ingestion endpoints, and the legacy read APIs all continue to function. Langfuse's own default
+  for fresh v4 installs (`events_only`) would reject ingestion from Python SDK 2.x and JS/TS SDK
+  3.x and earlier.
+* Langfuse's background backfill converts existing traces into the new v4 data model automatically.
+* **New: `/app/data/env.sh`** is sourced on every boot, after all package defaults. Use it to cut
+  over to the pure v4 data model (`LANGFUSE_MIGRATION_V4_WRITE_MODE=events_only`) once every SDK
+  and integration pointing at this install is v4-compatible. Until then the safe `dual` default
+  costs a little duplicate write volume and nothing else.
+* ClickHouse telemetry bounds re-verified against 26.4: `latency_log` no longer exists there; the
+  new `histogram_metric_log` and `background_schedule_pool_log` are disabled, along with the rest
+  of 26.4's active-by-default internal log tables (notably `query_views_log`, which would fire on
+  every ingest under v4's materialised-view data path).
+* **Memory limit raised from 5 GiB to 6 GiB.** Langfuse v4's web process does not fit the v3-era
+  768 MB Node heap (it fails at boot); it now gets 1536 MB, and the app's total limit moves up
+  with it. Existing installs pick the new limit up automatically on update.
+
 ## [0.2.1]
 
 * Bounds ClickHouse's own telemetry tables, which previously grew without limit. On a five-week idle

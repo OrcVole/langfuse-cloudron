@@ -53,17 +53,24 @@
     <timezone>UTC</timezone>
 
     <!-- Absolute cap, NOT a ratio: it is unverified whether the bundled CH reads the cgroup limit or host
-         RAM; a ratio against misread host RAM could OOM-kill the container (AGENTS.md, ADR memory note). -->
-    <max_server_memory_usage>2147483648</max_server_memory_usage>
+         RAM; a ratio against misread host RAM could OOM-kill the container (AGENTS.md, ADR memory note).
+         v0.3.0: raised 2 GiB to 2.5 GiB with ClickHouse 26.4, whose memory accounting is RSS-based and
+         whose baseline footprint is larger than 25.3's: on a 32-core host the old cap was breached at
+         near-idle (RSS 2.16 GiB) and EVERY query then failed MEMORY_LIMIT_EXCEEDED, caught by
+         test/ingest.sh. The app's total memoryLimit moved 5 to 6 GiB in the same change. -->
+    <max_server_memory_usage>2684354560</max_server_memory_usage>
     <mark_cache_size>536870912</mark_cache_size>
 
     <!-- v0.2.1 (ADR 0011): bound ClickHouse's own telemetry tables. Left on defaults they grow without
          limit and dominate the store: a five-week idle production install held 19.7 kB of application
          data against 176 million system-log rows in 3.9 GB, whose parts metadata alone pinned tracked
          memory above the cap (every aggregating query then fails) and whose background merges burned
-         4.5 to 7.8 cores continuously. Element set verified against THIS image's ClickHouse 25.3 via
-         system.tables, because the set differs across versions and a wrong element name fails silently
-         (25.3 has latency_log and opentelemetry_span_log; it lacks 25.12's background_schedule_pool_log).
+         4.5 to 7.8 cores continuously. Element set verified against THIS image's ClickHouse 26.4 via
+         its shipped config.xml + system.tables on a live 26.4 container (2026-08-02), because the set
+         differs across versions and a wrong element name fails silently. Differences from the 25.3 set
+         this file previously carried: latency_log no longer exists in 26.4 (element dropped here);
+         histogram_metric_log and background_schedule_pool_log are new in 26.4 and disabled below
+         (histogram_metric_log was observed actively writing at idle on a stock 26.4 container).
          query_log and error_log are kept, TTL-bounded, because they are the two an operator actually
          reads when debugging. NOTE for updates of existing installs: adding a TTL makes ClickHouse
          rename the old table to <name>_0 and start fresh; the one-time DROP of removed tables and the
@@ -77,8 +84,28 @@
     <query_metric_log remove="1"/>
     <processors_profile_log remove="1"/>
     <asynchronous_insert_log remove="1"/>
-    <latency_log remove="1"/>
     <opentelemetry_span_log remove="1"/>
+    <histogram_metric_log remove="1"/>
+    <background_schedule_pool_log remove="1"/>
+    <!-- The rest of 26.4's active-by-default log elements, disabled on the same principle. Three are
+         hot on THIS deployment: query_views_log writes a row per materialised-view execution and v4's
+         events_core is MV-populated (fires on every ingest); query_thread_log multiplies query_log
+         by thread count; blob_storage_log writes per blob operation. The remainder are inert here
+         (no ZooKeeper, no Iceberg/Delta lakehouse; backup_log never fires on the live server because
+         backupCommand dumps via clickhouse local on a snapshot copy) but cost nothing to disable and
+         would otherwise be a surprise the first time a feature touches them. session_log and
+         zookeeper_log are commented out in stock 26.4 config and need no element here. crash_log is
+         KEPT deliberately: it writes only on a server crash, and it is precisely what an operator
+         reads after one (the same test that keeps query_log and error_log). -->
+    <query_views_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <blob_storage_log remove="1"/>
+    <instrumentation_trace_log remove="1"/>
+    <backup_log remove="1"/>
+    <aggregated_zookeeper_log remove="1"/>
+    <zookeeper_connection_log remove="1"/>
+    <delta_lake_metadata_log remove="1"/>
+    <iceberg_metadata_log remove="1"/>
     <query_log><ttl>event_date + INTERVAL 3 DAY DELETE</ttl></query_log>
     <error_log><ttl>event_date + INTERVAL 3 DAY DELETE</ttl></error_log>
 </clickhouse>
