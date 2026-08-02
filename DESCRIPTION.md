@@ -1,3 +1,5 @@
+<upstream>3.199.0</upstream>
+
 Langfuse is an open-source LLM engineering platform. It gives you observability and tracing for LLM
 applications, evaluations, prompt management, a prompt playground, datasets, and usage/cost metrics —
 all self-hosted on your own Cloudron.
