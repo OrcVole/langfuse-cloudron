@@ -3,6 +3,18 @@
 All notable changes to this package. The community versions channel parses the bracket headings
 (`[0.1.0]`) literally, so keep that format.
 
+[0.4.0]
+
+* **Langfuse v4.2.0 to v4.3.0.** A routine upstream minor: no schema migrations, no new required
+  configuration, and no change to the bundled ClickHouse or MinIO.
+* Fixes to the v4 compatibility surface that this package's `dual` write mode relies on: legacy
+  dataset-run GET APIs are detected correctly again, and dashboards keep working against legacy
+  v4 traces.
+* The sidebar's background-migration indicator no longer lights up for migrations that are
+  switched off by configuration and will never run.
+* Upstream hardening: the signup API route now rejects non-POST methods with 405 rather than
+  returning an empty response.
+
 [0.3.0]
 
 * **Langfuse v3.199.0 to v4.2.0 (major), and bundled ClickHouse 25.3 to 26.4** (langfuse v4's
