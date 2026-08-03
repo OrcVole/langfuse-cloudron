@@ -21,6 +21,25 @@ trap cleanup EXIT
 cleanup
 
 echo "=== smoke: image=${IMAGE} engine=${ENGINE} ==="
+
+# 0. the image must BE the thing this checkout describes. The default tag is not built by this
+# script, so a stale tag left by an earlier round will run every assertion below against the wrong
+# code and report a clean pass. Measured 2026-08-03: lf-cloudron:dev still held langfuse 3.199.0
+# during the 4.3.0 round, and the suite reported 12/12 green while testing none of the new build.
+# Abort rather than FAIL — every later result is meaningless once the subject is wrong.
+WANT_UPSTREAM=$(grep -o '"upstreamVersion"[^,]*' "$(dirname "$0")/../CloudronManifest.json" | head -1 | cut -d'"' -f4)
+GOT_UPSTREAM=$($ENGINE run --rm --entrypoint sh "$IMAGE" -c \
+  'grep -o "\"version\": \"[^\"]*\"" /app/code/web/package.json | head -1 | cut -d\" -f4' 2>/dev/null)
+if [ -z "$GOT_UPSTREAM" ]; then
+  echo "ABORT: could not read the langfuse version baked into ${IMAGE}"; exit 2
+fi
+if [ "$WANT_UPSTREAM" != "$GOT_UPSTREAM" ]; then
+  echo "ABORT: ${IMAGE} bakes langfuse ${GOT_UPSTREAM}, but CloudronManifest.json says ${WANT_UPSTREAM}."
+  echo "       Build the image from this checkout before smoking it (stale-tag trap)."
+  exit 2
+fi
+ok "image bakes langfuse ${GOT_UPSTREAM}, matching the manifest"
+
 $ENGINE network create $NET >/dev/null
 $ENGINE volume create $VOL >/dev/null
 $ENGINE run -d --name $PG --network $NET -e POSTGRES_USER=langfuse -e POSTGRES_PASSWORD="$PGPASS" -e POSTGRES_DB=langfuse docker.io/library/postgres:17 >/dev/null
