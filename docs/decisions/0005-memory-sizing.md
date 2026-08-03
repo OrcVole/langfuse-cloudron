@@ -4,7 +4,11 @@ Date: 2026-06-26
 
 ## Status
 
-Accepted (Phase-4, operator-confirmed).
+Accepted (Phase-4, operator-confirmed). **Numbers superseded for v0.3.0 onwards** by
+[ADR 0007](0007-langfuse-v4-major-upgrade.md): langfuse v4 re-opened every figure here exactly as
+this ADR's own re-measure clause anticipated (web heap 768 MB → 1536 MB, ClickHouse cap
+2 GiB → 2.5 GiB, memoryLimit 5 GiB → 6 GiB). The method and the constrained-box pairing below
+remain current; scale the pairing's numbers proportionally.
 
 ## Context
 
