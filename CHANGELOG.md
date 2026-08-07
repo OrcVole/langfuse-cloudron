@@ -3,6 +3,15 @@
 All notable changes to this package. The community versions channel parses the bracket headings
 (`[0.1.0]`) literally, so keep that format.
 
+[0.5.0]
+
+* **Langfuse v4.3.0 to v4.6.0.** Routine upstream minors. One Prisma migration
+  (`add_media_association_origin`), proven over a 5958-trace corpus during the update gate with
+  count and content checksum identical before and after.
+* Bundled ClickHouse pin deliberately unchanged; no new services, no manifest changes beyond the
+  version fields.
+* Backup, in-place restore and trace ingestion re-verified on the gate fixture at this version.
+
 [0.4.0]
 
 * **Langfuse v4.2.0 to v4.3.0.** A routine upstream minor: no schema migrations, no new required
