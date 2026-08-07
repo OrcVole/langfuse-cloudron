@@ -17,15 +17,15 @@
 #   (node-musl -> /lib/ld-musl-x86_64.so.1; everything glibc -> /lib64/ld-linux-x86-64.so.2), and the
 #   musl loader is pointed at /opt/musl/lib ONLY (see step 1c), so the two libc worlds never cross.
 
-ARG LANGFUSE_VERSION=4.3.0
+ARG LANGFUSE_VERSION=4.6.0
 
 # ----- pinned upstream sources (digests verified 2026-08-03) -------------------------------------
 # v4.x web/worker images come from ghcr.io: upstream's Docker Hub push for 4.2.0 never happened
 # (Hub tops out at 4.1.0 as of 2026-08-02) while ghcr.io carries the 4.x line under the langfuse org.
 # ClickHouse 26.4 is langfuse v4's RECOMMENDED version (25.12 is the floor); digest is the 26.4
-# multi-arch list digest for 26.4.5.143 from Docker Hub. Unchanged at 4.3.0.
-FROM ghcr.io/langfuse/langfuse:4.3.0@sha256:2deb87e876b76bd05550115736308c59793c0ca3689e15c685c9189f716af0d0            AS lfweb
-FROM ghcr.io/langfuse/langfuse-worker:4.3.0@sha256:06f84882cf1b1043ab9dd8b6b82ad370cbd08ac7309eb8ccfc2d1948b322b528     AS lfworker
+# multi-arch list digest for 26.4.5.143 from Docker Hub. Unchanged across 4.3.0 -> 4.6.0.
+FROM ghcr.io/langfuse/langfuse:4.6.0@sha256:2e535d8e163c78f5c7162773280578c7e7aafe3b0589fc60a9a1225746b60fc7            AS lfweb
+FROM ghcr.io/langfuse/langfuse-worker:4.6.0@sha256:fcbf2ee82fa3f133c32c9ba0b5036fbd6e30466df0958a0a37e52f343b340d1b     AS lfworker
 FROM docker.io/clickhouse/clickhouse-server:26.4@sha256:ab3f33278b99576ea2ff2b0fa316b5e078c8b25f8ba08956cdbbb67d85c8b30f AS clickhouse
 FROM docker.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e                      AS minio
 FROM docker.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727                         AS mc
