@@ -32,3 +32,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.tmp
+
+# The anonymity denylist names what must never be published, so it is never published itself.
+.anonymize-list
