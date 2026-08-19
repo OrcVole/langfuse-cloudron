@@ -1,3 +1,8 @@
+[0.6.0]
+* Langfuse 4.14.0 (from 4.6.0), eleven upstream releases
+* Carries database migrations: three Prisma migrations land in this span (an always-allowed-tools column for in-app agent conversations, a dropped job_execution configuration foreign key, and PostHog integration error fields), plus a schema.prisma change
+* Gate 3 was run in full for this reason: update over populated data, then backup and restore
+
 # Changelog
 
 All notable changes to this package. The community versions channel parses the bracket headings
