@@ -17,15 +17,15 @@
 #   (node-musl -> /lib/ld-musl-x86_64.so.1; everything glibc -> /lib64/ld-linux-x86-64.so.2), and the
 #   musl loader is pointed at /opt/musl/lib ONLY (see step 1c), so the two libc worlds never cross.
 
-ARG LANGFUSE_VERSION=4.14.0
+ARG LANGFUSE_VERSION=4.15.0
 
 # ----- pinned upstream sources (digests verified 2026-08-03) -------------------------------------
 # v4.x web/worker images come from ghcr.io: upstream's Docker Hub push for 4.2.0 never happened
 # (Hub tops out at 4.1.0 as of 2026-08-02) while ghcr.io carries the 4.x line under the langfuse org.
 # ClickHouse 26.4 is langfuse v4's RECOMMENDED version (25.12 is the floor); digest is the 26.4
 # multi-arch list digest for 26.4.5.143 from Docker Hub. Unchanged across 4.3.0 -> 4.6.0.
-FROM ghcr.io/langfuse/langfuse:4.14.0@sha256:c866c50f91663264e07efae733bda8ad5199de52dab2765968fc9c2a4e59a57e            AS lfweb
-FROM ghcr.io/langfuse/langfuse-worker:4.14.0@sha256:161a5052b0b1959e23e1ae7c6cc8fcfe4985b91b5406b8eb7bc0db8c3b288c35     AS lfworker
+FROM ghcr.io/langfuse/langfuse:4.15.0@sha256:c2350a95d710f726f6466ffd47675eb704d0ff77fa1df1b9e6751ada6134ef75            AS lfweb
+FROM ghcr.io/langfuse/langfuse-worker:4.15.0@sha256:37a7c4251b602e60fd39451e6c252195908bf61837d4e252adbd752c0809e835     AS lfworker
 FROM docker.io/clickhouse/clickhouse-server:26.4@sha256:ab3f33278b99576ea2ff2b0fa316b5e078c8b25f8ba08956cdbbb67d85c8b30f AS clickhouse
 FROM docker.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e                      AS minio
 FROM docker.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727                         AS mc
@@ -35,6 +35,13 @@ FROM cloudron/base:5.0.0@sha256:04fd70dbd8ad6149c19de39e35718e024417c3e01dc9c663
 
 ARG LANGFUSE_VERSION
 ENV LANGFUSE_VERSION=${LANGFUSE_VERSION}
+# The PACKAGE version, ours, distinct from LANGFUSE_VERSION above. It exists only to stamp the OCI
+# label at the bottom of this file. That label was hardcoded "0.3.0" from 0.3.0 until 2026-08-20 and
+# was therefore wrong on four consecutive releases -- a version string that nothing reads is a
+# version string nobody notices is lying. Passed by the build as --build-arg PKG_VERSION=<manifest
+# version>; it defaults to "0.0.0-unset" so an unstamped image is obviously unstamped rather than
+# quietly claiming a real release.
+ARG PKG_VERSION=0.0.0-unset
 
 # -------------------------------------------------------------------------------------------------
 # 1. The isolated musl userland (S2). Every artifact here is COPYed from the pinned upstream web image,
@@ -135,6 +142,6 @@ LABEL org.opencontainers.image.title="Langfuse for Cloudron" \
       org.opencontainers.image.description="Open-source Langfuse (LLM observability) packaged for Cloudron" \
       org.opencontainers.image.source="https://github.com/OrcVole/langfuse-cloudron" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="0.3.0"
+      org.opencontainers.image.version="${PKG_VERSION}"
 
 CMD [ "/app/code/start.sh" ]
