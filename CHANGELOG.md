@@ -1,3 +1,9 @@
+[0.7.0]
+* Langfuse 4.15.0 (from 4.14.0), one upstream release
+* **Carries a credential-disclosure fix that upstream does not label security.** PR 16300: automation action configs were sanitised on the read path for webhook types only, so a GITHUB_DISPATCH config was returned verbatim with its stored githubToken to any project role down to VIEWER. Upstream backported it to the maintained v3 line the same day, which is the strongest signal available that they consider it serious. Also 16308 (tool payloads redacted from sandbox runtime logs) and 16302 (session-replay content masked)
+* **No schema migration.** 21 commits over 122 files with no schema.prisma change, no prisma/migrations, no ClickHouse migration and no .sql. The six files matching "migration" are the in-app v4 upgrade assistant's UI. Gate 3 was therefore run REDUCED — update over populated data, row counts and a content checksum, restore leg skipped
+* Checked before publishing: neither production install had ever held an automation action config, so nothing was disclosable here and no token needed rotating
+
 [0.6.0]
 * Langfuse 4.14.0 (from 4.6.0), eleven upstream releases
 * Carries database migrations: three Prisma migrations land in this span (an always-allowed-tools column for in-app agent conversations, a dropped job_execution configuration foreign key, and PostHog integration error fields), plus a schema.prisma change
