@@ -33,6 +33,7 @@ the running instance.
 with rationale or noted as a low-severity hardening opportunity (listed at the end).
 
 ### 1. Code / config / dependency surface
+
 - No hardcoded secrets in any tracked file; `test/secret-scan.sh` denylist gate **passes** (tracked tree
   clean). **[src][build]**
 - Entry scripts use `set -euo pipefail`, quoted expansions, no `eval`, and never interpolate external
@@ -48,6 +49,7 @@ with rationale or noted as a low-severity hardening opportunity (listed at the e
   `.dockerignore` and `.gitignore` exclude `*token*.txt`, `*.secret(s)`, `.env*`, and local notes. **[src]**
 
 ### 2. Container & capabilities
+
 - Manifest declares **no `capabilities`** → Cloudron default (no `NET_ADMIN`/`MLOCK`/etc.). **[src]**
 - **Zero package-introduced setuid/setgid binaries.** The only setuid files present are cloudron/base
   standard Ubuntu binaries (`su`, `sudo`, `mount`, `passwd`, …); the bundled binaries (`node-musl`,
@@ -61,6 +63,7 @@ with rationale or noted as a low-severity hardening opportunity (listed at the e
   (smoke PROOF 2). **[build]**
 
 ### 3. Network surface — verified against the running instance
+
 Listening sockets in the container **[box]**:
 
 | Service | Bind | Externally reachable? |
@@ -78,6 +81,7 @@ Listening sockets in the container **[box]**:
   anonymous-read policy has crept in); the internal ports are **unreachable** from outside. **[ext]**
 
 ### 4. Auth surface
+
 - `/api/public/*` is the **only** open-without-session surface, and ingestion is **API-key-gated** — a
   POST without a key returns **401** (confirmed live). The health path is intentionally open (200,
   liveness). **[ext][src]**
@@ -85,6 +89,7 @@ Listening sockets in the container **[box]**:
   `CLOUDRON_OIDC_*`). **No `proxyAuth`** anywhere; `optionalSso: true`. **[src]**
 
 ### 5. Secrets — at rest & in transit
+
 - **At rest:** `0600 cloudron` in `/app/data/.secrets` (live); `ENCRYPTION_KEY` is load-bearing and
   survives backup/restore **byte-identical** (Gate 3); never reseeded. **[box][build]**
 - **In logs:** entry scripts log secret *presence*, never *values*; the smoke gate asserts no
@@ -94,6 +99,7 @@ Listening sockets in the container **[box]**:
   plaintext on the trusted internal network — the standard Cloudron addon model. **[ext][src]**
 
 ### Observations accepted with rationale (not defects)
+
 1. **MinIO API on `0.0.0.0:9100`** — required so the Cloudron proxy can reach it for the public blob
    subdomain; external exposure is gated by a private bucket + presigned URLs (verified: 403 for
    anonymous).
@@ -113,6 +119,7 @@ Listening sockets in the container **[box]**:
    shipped. Tightening would require first verifying Langfuse's migration/runtime needs; deferred.
 
 ### Maintenance / re-test triggers
+
 - **Bump the pinned images on upstream security releases** (Langfuse, ClickHouse, MinIO, base) — pinning
   by digest means no automatic CVE patching.
 - Re-run `test/secret-scan.sh` (the release gate) and `test/smoke.sh` on every change.

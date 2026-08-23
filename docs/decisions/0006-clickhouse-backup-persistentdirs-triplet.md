@@ -94,6 +94,7 @@ contradict the intuitive design, so port them exactly:
   the empty `persistentDir`, RESTORE through it, then clean-shutdown.
 
 **Proven recipe (verbatim-portable):**
+
 - Backup: `clickhouse local --path=<snapshot> --config-file=backups.xml --query="BACKUP DATABASE default
   TO File('…')"`. **`DATABASE default`, NOT `BACKUP ALL`** — `ALL` trips on `system.users` access entities
   (`ACCESS_STORAGE_DOESNT_ALLOW_BACKUP`); user accounts come from `users.d` config at boot.

@@ -1,7 +1,7 @@
 # Upstream report: ClickHouse backup syncer race
 
 This issue is filed upstream on the Cloudron forum:
-https://forum.cloudron.io/topic/15663/backup-task-crashes-when-a-clickhouse-app-deletes-a-temp-merge-dir-mid-snapshot
+<https://forum.cloudron.io/topic/15663/backup-task-crashes-when-a-clickhouse-app-deletes-a-temp-merge-dir-mid-snapshot>
 
 **Summary.** A bundled-ClickHouse app's background merge temp directories (`tmp_merge_*`, `tmp_insert_*`,
 `tmp_fetch_*`) can vanish mid-snapshot while Cloudron's rsync syncer walks the data tree; `readTree` then
