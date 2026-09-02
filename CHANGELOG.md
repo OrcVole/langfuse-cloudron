@@ -1,3 +1,11 @@
+[0.8.0]
+
+- Update langfuse 4.15.0 -> 4.27.0
+- Security: prevents SSRF via crafted analytics export URLs, PII exposure in Sentry session replays, credential leakage to unintended endpoints, unauthorised deletion of project API keys, authentication flow bypasses, denial of service via oversized OTLP payloads, unauthorised access to audit-log exports and blob-storage endpoints, prototype-chain clobbering in OTel attribute mapping, customer data leakage to third-party analytics, and unauthorised access to restricted prompts and historical data
+- Breaking changes: v4 migration UI now shown by default in dual-write mode; LANGFUSE_AWS_BEDROCK_* env vars replaced by LANGFUSE_AI_*; default JWT session max age reduced to 14 days; in-app agent now gated behind LANGFUSE_IN_APP_AGENT_ENABLED; unstable evaluator API endpoints sunset; LANGFUSE_AI_PROVIDER now required; evaluation RBAC scope names renamed; self-hosted entrypoints now respect DATABASE_PORT
+- Other: routine features and fixes across 12 release chunks
+- No packaging changes: version and web/worker image digests re-pinned; base and built images digest-pinned
+
 [0.7.0]
 
 - Langfuse 4.15.0 (from 4.14.0), one upstream release
