@@ -1,3 +1,16 @@
+[0.9.0]
+
+- Update langfuse 4.27.0 to 4.36.0
+- New Prisma migrations: AI Gateway control plane tables (gateway_configs, gateway_ai_connections,
+  gateway_api_key_associations) and a nullable sessions_expired_at column on the users table for
+  session revocation
+- Authentication hardening: password resets bound to one-time codes; sign-in/sign-up pages refactored
+  into feature components
+- Deprecated API endpoint warning attached to legacy ingestion writes (data may be delayed by about
+  10 minutes); existing SDKs continue to work but should migrate
+- ClickHouse migration files reorganised into a canonical directory layout; no operator action required
+- No breaking changes, no new configuration, no upgrade steps needed
+
 [0.8.0]
 
 - Update langfuse 4.15.0 -> 4.27.0
