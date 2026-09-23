@@ -135,10 +135,40 @@ COPY --from=minio /usr/bin/minio /usr/bin/minio
 COPY --from=mc    /usr/bin/mc    /usr/bin/mc
 
 # -------------------------------------------------------------------------------------------------
+# 4b. napi-rs native modules: point each loader at the musl binary upstream actually installed.
+#     napi-rs loaders choose a binary by reading /usr/bin/ldd. On this glibc base that says "gnu", but
+#     the upstream Alpine images install only the *-musl binaries -- and musl is correct, because the
+#     Node we run IS musl (step 1d). Found 2026-09-23: langfuse 4.43's new @langfuse/native (and
+#     @node-rs/xxhash, used by traceBatching) failed to load, so the worker crash-looped while
+#     supervisor still reported it RUNNING and the smoke test passed; no trace ever reached
+#     ClickHouse (test/ingest.sh caught it). Fixed PER MODULE with a symlink from the gnu name to the
+#     installed musl binary: the loaders' global override, NAPI_RS_NATIVE_LIBRARY_PATH, would make
+#     every napi-rs module in the process load the same file.
+# -------------------------------------------------------------------------------------------------
+RUN set -eu; \
+    for idx in $(grep -rl --include=index.js isMuslFromFilesystem /app/code/web /app/code/worker || true); do \
+      d=$(dirname "$idx"); \
+      for gnu in $(grep -oE "\./[A-Za-z0-9._-]+\.linux-x64-gnu\.node" "$idx" | sort -u); do \
+        name=${gnu#./}; musl=$(echo "$name" | sed 's/linux-x64-gnu/linux-x64-musl/'); \
+        if [ -f "$d/$musl" ]; then ln -sf "$musl" "$d/$name"; echo "napi: $d/$name -> $musl"; continue; fi; \
+        pkg=$(grep -oE "require\('[^']+-linux-x64-musl'\)" "$idx" | head -1 | sed -E "s/require\('(.+)'\)/\1/"); \
+        f=$(find /app/code -path "*/node_modules/$pkg/$musl" | head -1); \
+        if [ -n "$f" ]; then ln -sf "$f" "$d/$name"; echo "napi: $d/$name -> $f"; \
+        else echo "napi: NO musl binary for $idx ($pkg/$musl)"; exit 1; fi; \
+      done; \
+    done
+
 # 5. Build-time gates — prove the assembled shape on the base before shipping (deeper engine-load, DNS,
 #    and live libc-isolation proofs run in the runtime smoke test).
 # -------------------------------------------------------------------------------------------------
 RUN echo "== gate: musl node =="        && /usr/local/bin/node-musl --version
+# Every napi-rs native module must actually LOAD under the musl Node (step 4b). A module that does not
+# load kills the worker on start, which supervisor restarts forever while reporting RUNNING.
+RUN echo "== gate: napi-rs native modules load ==" && set -eu \
+ && n=0; for idx in $(grep -rl --include=index.js isMuslFromFilesystem /app/code/web /app/code/worker || true); do \
+      /usr/local/bin/node-musl -e "require('$idx')" || { echo "napi-rs module FAILS to load: $idx"; exit 1; }; \
+      echo "loads: $idx"; n=$((n+1)); \
+    done; echo "napi-rs modules loaded: $n"; [ "$n" -ge 2 ]
 RUN echo "== gate: musl schema-engine ==" && /app/code/.engines/schema-engine --version
 RUN echo "== gate: static migrate =="   && /usr/bin/migrate -version
 RUN echo "== gate: clickhouse =="        && /usr/bin/clickhouse --version \

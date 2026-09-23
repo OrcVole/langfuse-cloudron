@@ -1,13 +1,19 @@
 [0.10.0]
 
 - Update langfuse 4.36.0 to 4.43.0.
+- The update applies two PostgreSQL migrations (evaluator templates and questions) and one ClickHouse
+  migration that adds search indexes for new data only; existing data is not rewritten, so the first
+  start after updating is not slowed on a large install.
+- langfuse 4.43 adds a native module to the worker; the package now makes sure it loads (the upstream
+  loader otherwise picks the wrong build on this platform and the worker cannot start).
 - MinIO/mc moved from docker.io to quay.io: docker.io/minio/{minio,mc} now denies every anonymous
   pull, including the digest this package had pinned, so the previous build was no longer
-  reproducible. Also bumps MinIO to its newest available build, closing one of two CRITICAL CVEs a
-  fleet-wide scan found in it (google.golang.org/grpc). The other (github.com/rabbitmq/amqp091-go,
-  MinIO's optional RabbitMQ bucket-notification target) has no fix available in any MinIO build
-  published so far; this package never configures that target, so it is inert here, and we will
-  keep checking for a fixed build.
+  reproducible. MinIO is also bumped to its newest available build.
+- Known, not yet fixable: security scanners report four CRITICAL findings in the bundled MinIO
+  server and client. Three are in MinIO's optional RabbitMQ bucket-notification target
+  (github.com/rabbitmq/amqp091-go), which this package never configures; one is a gRPC server
+  authorisation issue (google.golang.org/grpc) in the `mc` client, which never runs a gRPC server.
+  No MinIO or mc build with fixed versions has been published yet; we will update as soon as one is.
 - Rebuilt on cloudron/base:5.1.0 (was 5.0.0), a routine fleet-wide bump, no functional change.
 
 [0.9.0]

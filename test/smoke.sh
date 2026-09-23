@@ -63,6 +63,15 @@ done
 # 2. all four services RUNNING
 st=$($ENGINE exec $APP supervisorctl -c /etc/supervisor/supervisord.conf status 2>/dev/null)
 for svc in clickhouse minio web worker; do echo "$st" | grep -qE "^${svc}\s+RUNNING" && ok "service ${svc} RUNNING" || bad "service ${svc} not RUNNING"; done
+# RUNNING is a snapshot: a crash-looping worker is RUNNING between restarts, and 0.10.0's first build
+# passed every check above while its worker died on each start (a native module failed to load) and no
+# trace ever reached ClickHouse. So the worker must STAY up: wait, then require an uptime longer than
+# the wait. supervisorctl prints "uptime H:MM:SS".
+sleep 45
+wup=$($ENGINE exec $APP supervisorctl -c /etc/supervisor/supervisord.conf status worker 2>/dev/null | grep -oE 'uptime [0-9:]+' | awk '{print $2}')
+wsec=$(echo "${wup:-0:0:0}" | awk -F: '{print ($1*3600)+($2*60)+$3}')
+[ "${wsec:-0}" -ge 40 ] && ok "worker stayed up (uptime ${wup}, no restart during a 45s wait)" \
+  || bad "worker restarted: uptime only ${wup:-none} after a 45s wait (crash loop; check the worker log)"
 
 # 3. ENCRYPTION_KEY 64 hex + not in logs
 klen=$($ENGINE exec $APP sh -c '. /app/data/.secrets/secrets.env; printf %s "$ENCRYPTION_KEY" | wc -c')

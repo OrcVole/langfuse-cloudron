@@ -47,5 +47,5 @@
   "contactEmail": "Most+github@OrcadianVole.com",
   "iconUrl": "https://raw.githubusercontent.com/OrcVole/langfuse-cloudron/main/logo.png",
   "mediaLinks": [ "https://raw.githubusercontent.com/OrcVole/langfuse-cloudron/main/logo.png" ],
-  "dockerImage": "ghcr.io/orcvole/langfuse-cloudron@sha256:bde8a26222526d58f5715c32730df219c5ad7ea46525fee9296a30b7cc703255"
+  "dockerImage": "ghcr.io/orcvole/langfuse-cloudron@sha256:bfd1f5c16f94699119e8d8e07670a6ae57f814a6b0c72ae49314c643614ae3ad"
 }

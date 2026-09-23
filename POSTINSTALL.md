@@ -2,11 +2,11 @@
 
 **This is a full web app with its own login.** Open the app and create your account.
 
-`<sso>`
+<sso>
 You can sign in with your Cloudron account (single sign-on via OIDC), or create a Langfuse-native
 email/password account. The first user to sign up becomes the owner.
 </sso>
-`<nosso>`
+<nosso>
 Create the first Langfuse account by signing up at the app's URL. The first user to sign up becomes
 the owner.
 </nosso>
