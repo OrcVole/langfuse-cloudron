@@ -1,3 +1,15 @@
+[0.10.0]
+
+- Update langfuse 4.36.0 to 4.43.0.
+- MinIO/mc moved from docker.io to quay.io: docker.io/minio/{minio,mc} now denies every anonymous
+  pull, including the digest this package had pinned, so the previous build was no longer
+  reproducible. Also bumps MinIO to its newest available build, closing one of two CRITICAL CVEs a
+  fleet-wide scan found in it (google.golang.org/grpc). The other (github.com/rabbitmq/amqp091-go,
+  MinIO's optional RabbitMQ bucket-notification target) has no fix available in any MinIO build
+  published so far; this package never configures that target, so it is inert here, and we will
+  keep checking for a fixed build.
+- Rebuilt on cloudron/base:5.1.0 (was 5.0.0), a routine fleet-wide bump, no functional change.
+
 [0.9.0]
 
 - Update langfuse 4.27.0 to 4.36.0

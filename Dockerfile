@@ -17,21 +17,42 @@
 #   (node-musl -> /lib/ld-musl-x86_64.so.1; everything glibc -> /lib64/ld-linux-x86-64.so.2), and the
 #   musl loader is pointed at /opt/musl/lib ONLY (see step 1c), so the two libc worlds never cross.
 
-ARG LANGFUSE_VERSION=4.36.0
+ARG LANGFUSE_VERSION=4.43.0
 
-# ----- pinned upstream sources (digests verified 2026-08-03) -------------------------------------
+# ----- pinned upstream sources (digests verified 2026-09-23) -------------------------------------
 # v4.x web/worker images come from ghcr.io: upstream's Docker Hub push for 4.2.0 never happened
 # (Hub tops out at 4.1.0 as of 2026-08-02) while ghcr.io carries the 4.x line under the langfuse org.
-# ClickHouse 26.4 is langfuse v4's RECOMMENDED version (25.12 is the floor); digest is the 26.4
-# multi-arch list digest for 26.4.5.143 from Docker Hub. Unchanged across 4.3.0 -> 4.6.0.
-FROM ghcr.io/langfuse/langfuse:4.36.0@sha256:b0556ab389af97d861185323e6dbd410464bb2b1669bd819251cb3635c291c07            AS lfweb
-FROM ghcr.io/langfuse/langfuse-worker:4.36.0@sha256:25212a931e27f5d8a87cb25c81b5ccdb9f239655c1d9efb54a4378ded32c2c9e     AS lfworker
-FROM docker.io/clickhouse/clickhouse-server:26.4@sha256:ab3f33278b99576ea2ff2b0fa316b5e078c8b25f8ba08956cdbbb67d85c8b30f AS clickhouse
-FROM docker.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e                      AS minio
-FROM docker.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727                         AS mc
+# ClickHouse 26.4 is langfuse v4's RECOMMENDED version (25.12 is the floor); digest re-resolved from
+# the 26.4 tag, which drifted since 2026-08-03 (mutable tag, expected; re-verify at every bump).
+#
+# MinIO/mc moved from docker.io to quay.io (2026-09-23 round): docker.io/minio/{minio,mc} now
+# returns "requested access to the resource is denied" for EVERY tag, including the digest this
+# file had pinned -- not a new restriction on old versions, the whole docker.io repo is gone for
+# anonymous pulls. quay.io/minio/{minio,mc} serves the identical content (matching digests for the
+# tags this file already had pinned), and is the registry MinIO's own docs point to now.
+#
+# minio: bumped to the newest available build (RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772,
+# 2026-04-01) to fix google.golang.org/grpc CVE-2026-33186 in one embedded copy. It does NOT close
+# github.com/rabbitmq/amqp091-go CVE-2026-77405/77408/77411 (still v1.10.0, fix needs 1.13.0) or a
+# second embedded grpc copy at v1.71.0 -- checked every tag MinIO has published since, none fixes
+# it (trivy re-run against the candidate before pinning, not assumed). Accepted as an open upstream
+# gap: amqp091-go backs MinIO's optional bucket-notification-to-RabbitMQ target, which this package
+# never configures (no MINIO_NOTIFY_AMQP_* anywhere in start.sh), and the remaining grpc copy is
+# MinIO's inter-node clustering RPC, inert in the single-node standalone mode this package runs
+# (one MINIO_STORE path, no distributed/erasure-coding flags). Re-check every future bump.
+# mc: same content as before (digest unchanged), only the registry moved.
+FROM ghcr.io/langfuse/langfuse:4.43.0@sha256:d6165b4ef72027c128c6132a4d87a4643945f6ba01f9cb5d6e4af7e5e3bf5316            AS lfweb
+FROM ghcr.io/langfuse/langfuse-worker:4.43.0@sha256:59be62f49978b656b27656cba7314097c6e9ca8d63ed6ef6f66394f6aaeede1b     AS lfworker
+FROM docker.io/clickhouse/clickhouse-server:26.4@sha256:c7796a1335d14385c052f10061cf719f4a368a908432ec25980860b1333e9ccd AS clickhouse
+FROM quay.io/minio/minio@sha256:cf3dadcfa1fb0324f43958bad1abba986d53c4ecc04d4d50b46c7dcda28bd3cd                        AS minio
+FROM quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727                           AS mc
 
 # =================================================================================================
-FROM cloudron/base:5.0.0@sha256:04fd70dbd8ad6149c19de39e35718e024417c3e01dc9c6637eaf4a41ec4e596c
+# 5.1.0, not 5.0.0: fleet policy since crawl4ai 2026-09-23 (field guide #265) is to fold the base
+# bump into each package's next natural update round rather than a dedicated sweep; this is that
+# round for langfuse. Same Ubuntu 24.04/glibc 2.39 ABI. Re-run the secret scan after rebuilding
+# (field guide #266: 5.1.0 dropped the base's inert SSH host keys entirely, 3 -> 0 expected).
+FROM cloudron/base:5.1.0@sha256:1c0666c9abe9e2090d33686826d4e97769b799124573118d41e0d7485135748e
 
 ARG LANGFUSE_VERSION
 ENV LANGFUSE_VERSION=${LANGFUSE_VERSION}
