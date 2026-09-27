@@ -63,7 +63,7 @@ a destination that is by then live and diverging.
 
 ### The sequence, per store
 
-```
+```text
 1. If the source does not hold REAL DATA, there is nothing to do. "Real data" means a non-empty
    sentinel subdirectory: store/ or metadata/ for ClickHouse, .minio.sys for MinIO. A directory
    that merely exists never counts (see "What counts as a store" below).

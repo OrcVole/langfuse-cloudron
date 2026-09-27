@@ -55,7 +55,7 @@ and caches it with `stat: { mtime: ..., size: ..., inode: entryStat.inode, mode:
 `JSON.stringify` omits it from the cache entry, and the third clause evaluates
 `undefined !== undefined`, which is always false. Verified on a 9.2.0 rig:
 
-```
+```bash
 $ node -e 'const s=require("fs").statSync("/etc/hostname"); console.log(s.ino, s.inode)'
 149641 undefined
 ```

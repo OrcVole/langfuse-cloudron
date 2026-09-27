@@ -10,7 +10,7 @@ Langfuse ingests over TLS on its app domain. Two transports, two auth forms — 
 - **Langfuse SDK (recommended for application code).** The Python/JS SDK creates a full trace +
   *generation* tree (prompt, completion, model, token usage). Configure it with SDK env:
 
-  ```
+  ```bash
   LANGFUSE_PUBLIC_KEY=<your-public-key>
   LANGFUSE_SECRET_KEY=<your-secret-key>
   LANGFUSE_HOST=https://langfuse.example.com
@@ -22,7 +22,7 @@ Langfuse ingests over TLS on its app domain. Two transports, two auth forms — 
 
 - **Raw OpenTelemetry / OTLP.** Point any OTLP/HTTP client at the OTLP path with HTTP Basic auth:
 
-  ```
+  ```yaml
   endpoint:      https://langfuse.example.com/api/public/otel/v1/traces
   Authorization: Basic base64(<public-key>:<secret-key>)
   Content-Type:  application/x-protobuf   (application/json also accepted)
@@ -44,7 +44,7 @@ This is the only path that yields the rich prompt/completion/model/token tree La
 
 Open WebUI (v0.6.16+) has native OpenTelemetry. Wire it on the Open WebUI app (env), not on Langfuse:
 
-```
+```bash
 ENABLE_OTEL=true
 ENABLE_OTEL_TRACES=true
 OTEL_OTLP_SPAN_EXPORTER=http          # REQUIRED: the default is grpc, which sends cleartext to :443

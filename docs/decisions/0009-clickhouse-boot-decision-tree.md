@@ -48,7 +48,7 @@ This ADR says above that the boot tree "is the belt that carries the load", and 
 carries a comment saying the boot path "is what actually rebuilds a cloned install". **The clone gate
 refutes that specific claim.** Cloning a v0.2.0 install produced this boot log:
 
-```
+```text
 ==> [restore] MinIO persistentDir already holds a MinIO store — refusing to clobber (no-op)
 ==> [restore] ClickHouse persistentDir already populated — refusing to clobber (no-op)
 ```

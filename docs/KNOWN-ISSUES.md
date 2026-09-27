@@ -35,7 +35,7 @@ unhealthy for minutes. Adding the retention also renames the old `query_log`/`er
 `query_log_0`/`error_log_0` rather than trimming them. Immediately after the update, in the app's
 terminal (DDL works even while queries are starving):
 
-```
+```text
 clickhouse-client --user clickhouse --password "$CLICKHOUSE_PASSWORD" --query "
   DROP TABLE IF EXISTS system.trace_log SYNC; DROP TABLE IF EXISTS system.text_log SYNC;
   DROP TABLE IF EXISTS system.part_log SYNC; DROP TABLE IF EXISTS system.metric_log SYNC;
@@ -56,7 +56,7 @@ server (26.4 disables it in this package's config, which stops the writes but ke
 Measured on the update gate: a few dozen KB, not the gigabytes of the 0.2.1 cleanup, so this is
 tidiness rather than urgency. Optional one-time cleanup, in the app's terminal:
 
-```
+```text
 clickhouse-client --user clickhouse --password "$CLICKHOUSE_PASSWORD" --query "
   DROP TABLE IF EXISTS system.query_log_0 SYNC; DROP TABLE IF EXISTS system.error_log_0 SYNC;
   DROP TABLE IF EXISTS system.backup_log SYNC"
@@ -93,7 +93,7 @@ empty directory**, and do not conclude the migration destroyed anything.
 When you next update to v0.2.0, the app finds the restored v0.1.0 data in `/app/data` alongside that
 older store, and it says so in the boot log before doing anything:
 
-```
+```text
 ==> [migrate] clickhouse: legacy data at /app/data/clickhouse while /var/lib/clickhouse is already populated
 ==> [migrate] clickhouse: ... DISCARDING the current contents of /var/lib/clickhouse
 ==> [migrate] clickhouse: and migrating the restored data in their place.
