@@ -52,15 +52,15 @@ with rationale or noted as a low-severity hardening opportunity (listed at the e
 
 - Manifest declares **no `capabilities`** → Cloudron default (no `NET_ADMIN`/`MLOCK`/etc.). **[src]**
 - **Zero package-introduced setuid/setgid binaries.** The only setuid files present are cloudron/base
-  standard Ubuntu binaries (`su`, `sudo`, `mount`, `passwd`, …); the bundled binaries (`node-musl`,
+  standard Ubuntu binaries (`su`, `sudo`, `mount`, `passwd`, …); the bundled binaries (`node`,
   `clickhouse`, `minio`, `mc`, `migrate`) are not setuid. The base userland is platform-mandated and not
   package-strippable. **[box]**
 - Network-facing services run as **`cloudron`**, not root (confirmed: `minio`, `clickhouse`; web/worker
   are `user=cloudron` per the supervisor config); only `supervisord` is root. **[box][src]**
 - Secrets-at-rest perms confirmed on the live instance: `/app/data/.secrets` = **700**, `secrets.env` =
   **600**, owner `cloudron:cloudron`. **[box]**
-- musl/glibc isolation holds: `node-musl` maps only `/opt/musl/lib`; `clickhouse` maps only glibc
-  (smoke PROOF 2). **[build]**
+- Since 0.11.0 every process is glibc; no musl object is mapped by any process (smoke check 5). The
+  earlier musl/glibc isolation (`node-musl` under `/opt/musl/lib`) is retired. **[build]**
 
 ### 3. Network surface — verified against the running instance
 

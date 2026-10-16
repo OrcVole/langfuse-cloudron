@@ -4,8 +4,8 @@
 #   - all four services (clickhouse, minio, web, worker) reach RUNNING
 #   - /api/public/health returns 200 with NO auth
 #   - ENCRYPTION_KEY is exactly 64 hex; no secret leaks into the logs
-#   - musl Node resolves+connects to Postgres & Redis by container hostname (Docker-DNS path)
-#   - libc isolation holds live: node-musl maps only /opt/musl/lib; clickhouse only glibc
+#   - upstream (glibc) Node resolves+connects to Postgres & Redis by container hostname (Docker-DNS path)
+#   - no musl object is mapped by any process (the musl-in-place shape was retired in 0.11.0)
 #   - ClickHouse runs in UTC
 # Usage: test/smoke.sh [IMAGE]   (default IMAGE=lf-cloudron:dev). Set ENGINE=docker to use docker.
 set -uo pipefail
@@ -79,25 +79,21 @@ klen=$($ENGINE exec $APP sh -c '. /app/data/.secrets/secrets.env; printf %s "$EN
 ek=$($ENGINE exec $APP sh -c '. /app/data/.secrets/secrets.env; printf %s "$ENCRYPTION_KEY"')
 $ENGINE logs $APP 2>&1 | grep -qF "$ek" && bad "ENCRYPTION_KEY leaked into logs" || ok "no ENCRYPTION_KEY in logs"
 
-# 4. musl -> container-DNS -> CONNECT (pg + redis by hostname)
-$ENGINE exec $APP /usr/local/bin/node-musl -e '
+# 4. glibc node -> container-DNS -> CONNECT (pg + redis by hostname)
+$ENGINE exec $APP /usr/local/bin/node -e '
 const net=require("net"),dns=require("dns");
 const probe=(h,p)=>new Promise(r=>dns.lookup(h,(e,a)=>{if(e){console.log("DNSFAIL "+h+" "+e.code);return r(1)}const s=net.connect(p,h,()=>{console.log("CONNECT-OK "+h);s.end();r(0)});s.on("error",er=>{console.log("CONNFAIL "+h+" "+er.code);r(1)})}));
 (async()=>{const a=await probe(process.env.CLOUDRON_REDIS_HOST,6379);const b=await probe(new URL(process.env.CLOUDRON_POSTGRESQL_URL).hostname,5432);process.exit(a||b)})();' \
-  && ok "musl Node connects to pg+redis by hostname" || bad "musl Node hostname connect failed"
+  && ok "Node connects to pg+redis by hostname" || bad "Node hostname connect failed"
 
-# 5. libc isolation (enumerate by exe; needs ptrace)
+# 5. no musl anywhere (enumerate by pid; needs ptrace). Since 0.11.0 every process is glibc.
 iso=$($ENGINE exec --privileged $APP bash -c '
 bad=0
 for pid in $(ls /proc | grep -E "^[0-9]+$"); do
-  exe=$(readlink /proc/$pid/exe 2>/dev/null) || continue
-  case "$exe" in
-    */node-musl)  grep -qE "x86_64-linux-gnu/libc.so.6" /proc/$pid/maps 2>/dev/null && { echo "node-musl maps glibc"; bad=1; } ;;
-    */clickhouse) grep -qE "/opt/musl/lib" /proc/$pid/maps 2>/dev/null && { echo "clickhouse maps musl"; bad=1; } ;;
-  esac
+  grep -qE "ld-musl|/opt/musl" /proc/$pid/maps 2>/dev/null && { echo "pid $pid ($(readlink /proc/$pid/exe)) maps musl"; bad=1; }
 done
 echo "ISO=$bad"')
-echo "$iso" | grep -q "ISO=0" && ok "libc isolation holds (node-musl=musl, clickhouse=glibc)" || bad "libc isolation breach: $iso"
+echo "$iso" | grep -q "ISO=0" && ok "no process maps musl (all glibc)" || bad "musl object mapped: $iso"
 
 # 6. ClickHouse UTC
 tz=$($ENGINE exec $APP sh -c '. /app/data/.secrets/secrets.env; curl -s "http://localhost:8123/?user=clickhouse&password=${CLICKHOUSE_PASSWORD}" --data-binary "SELECT timezone()"' 2>/dev/null)

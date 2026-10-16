@@ -106,9 +106,19 @@ legacy tree once the app has actually served traffic. This path is gate-tested e
 ### Recipe: making an in-place restore actually restore ClickHouse
 
 1. Perform the in-place restore as normal and let the app come up.
-2. **Stop** the app.
-3. Clear the ClickHouse store: in *Terminal* or the file manager, empty `/var/lib/clickhouse`.
-4. **Start** the app.
+2. Put the app in **recovery mode** (`cloudron debug --app <app>`, or the dashboard's recovery mode),
+   and make sure it is running (`cloudron start --app <app>`). A stopped app has no container, so the
+   Terminal cannot open on it.
+3. In the *Terminal*, stop ClickHouse if it is running (`pkill -f clickhouse-server`, then check
+   `pgrep -f clickhouse-server` prints nothing), then empty the store:
+   `find /var/lib/clickhouse -mindepth 1 -maxdepth 1 -exec rm -rf {} +`.
+4. Leave recovery mode (`cloudron debug --app <app> --disable`), which restarts the app normally.
+
+Verified 2026-10-16 on package 0.11.0 (Cloudron 10.1.5): 52 traces at backup, 53 after a post-backup
+write, still 53 after the in-place restore, and 52 after steps 2 to 4, with ClickHouse rebuilt at
+schema version 53. That run emptied the store without the `pkill` in step 3 (ClickHouse was running in
+recovery mode); the restart in step 4 still rebuilt it correctly, but stopping the database before
+deleting its files is the safe order, so step 3 says to.
 
 On that boot the app finds an empty store alongside the restored dump and rebuilds ClickHouse from it,
 which takes a few minutes for a large store. To roll MinIO back too, empty `/var/lib/minio` in the same

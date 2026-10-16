@@ -7,8 +7,8 @@
   "changelog": "file://CHANGELOG.md",
   "icon": "file://logo.png",
   "tags": [ "notes", "project" ],
-  "version": "0.10.0",
-  "upstreamVersion": "4.43.0",
+  "version": "0.11.0",
+  "upstreamVersion": "4.62.0",
   "healthCheckPath": "/api/public/health",
   "httpPort": 3000,
   "persistentDirs": [ "/var/lib/clickhouse", "/var/lib/minio" ],
@@ -47,5 +47,5 @@
   "contactEmail": "Most+github@OrcadianVole.com",
   "iconUrl": "https://raw.githubusercontent.com/OrcVole/langfuse-cloudron/main/logo.png",
   "mediaLinks": [ "https://raw.githubusercontent.com/OrcVole/langfuse-cloudron/main/logo.png" ],
-  "dockerImage": "ghcr.io/orcvole/langfuse-cloudron@sha256:bfd1f5c16f94699119e8d8e07670a6ae57f814a6b0c72ae49314c643614ae3ad"
+  "dockerImage": "ghcr.io/orcvole/langfuse-cloudron@sha256:c4f370012aa5ecab875ae40b8584b97b6fb0c331ac7e559516e1d33ad0c4671b"
 }

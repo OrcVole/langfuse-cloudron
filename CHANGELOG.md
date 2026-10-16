@@ -1,3 +1,20 @@
+[0.11.0]
+
+- Base image cloudron/base 5.1.0 to 6.0.0 (Ubuntu 26.04, glibc 2.43).
+- Update langfuse 4.43.0 to 4.62.0. Confirmed security fixes: SCIM changes of organisation OWNER now
+  require the ownership permission (4.61.0), and LIKE wildcards are escaped in the remaining substring
+  searches (4.62.0). SCIM and enterprise features are not enabled in this package.
+- The update applies 17 PostgreSQL migrations (roles and role assignments, skills, topics, audit log
+  staging, gateway connections, tracing readiness settings, integration backfill flags) and 4 ClickHouse
+  migrations (0050 to 0053). Migration 0050 rebuilds the scores index in place and 0053 adds columns
+  and rewrites the events materialised view, so the first start after updating can take longer on a
+  large install.
+- Upstream now ships its images on Red Hat UBI 9 (glibc) instead of Alpine (musl). The package no
+  longer carries a separate musl userland: it runs the upstream Node 24.21 and Prisma engines directly
+  on the base. Node major unchanged (24).
+- Documentation: the 60 second proxy cut-off mentioned in the integrations notes was wrong; Cloudron
+  does not cut requests at 60 seconds, the limit a client hits is its own timeout.
+
 [0.10.0]
 
 - Update langfuse 4.36.0 to 4.43.0.

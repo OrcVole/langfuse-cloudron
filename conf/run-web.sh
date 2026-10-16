@@ -31,14 +31,14 @@ REDISCLI_AUTH="${REDIS_AUTH}" wait_for "redis" redis-cli -h "${REDIS_HOST}" -p "
 
 # The 'langfuse' bucket is pre-created by start.sh (mkdir under the MinIO data dir — the upstream pattern).
 
-# Migrations run ONCE here (the worker waits on the flag). node-musl => the forced musl query engine loads.
+# Migrations run ONCE here (the worker waits on the flag). the forced rhel query engine loads.
 PRISMA="/app/code/prisma-cli/build/index.js"
 log "postgres: cleanup + migrate deploy"
-/usr/local/bin/node-musl "${PRISMA}" db execute --url "${DIRECT_URL}" --file ./packages/shared/scripts/cleanup.sql || true
-/usr/local/bin/node-musl "${PRISMA}" migrate deploy --schema=./packages/shared/prisma/schema.prisma
+/usr/local/bin/node "${PRISMA}" db execute --url "${DIRECT_URL}" --file ./packages/shared/scripts/cleanup.sql || true
+/usr/local/bin/node "${PRISMA}" migrate deploy --schema=./packages/shared/prisma/schema.prisma
 log "clickhouse: migrate up"
 ( cd ./packages/shared && bash ./clickhouse/scripts/up.sh )   # bash, NOT sh: up.sh uses bashisms (&>)
 
 touch /run/langfuse/migrated
 log "migrations complete — starting web on 0.0.0.0:${PORT}"
-exec /usr/local/bin/node-musl ./web/server.js --keepAliveTimeout 110000
+exec /usr/local/bin/node ./web/server.js --keepAliveTimeout 110000

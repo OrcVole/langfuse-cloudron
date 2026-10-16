@@ -30,4 +30,4 @@ until [ -f /run/langfuse/migrated ]; do
 done
 
 log "dependencies ready — starting worker on :${PORT}"
-exec /usr/local/bin/node-musl worker/dist/index.js
+exec /usr/local/bin/node worker/dist/index.js

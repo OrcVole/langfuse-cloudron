@@ -76,10 +76,12 @@ receiver.
 
 - **`langfuse.openai` against a CPU-only ollama drops the call intermittently.** During the RAG example
   on a CPU-only box, the wrapped LLM call hit `APIConnectionError` ("Server disconnected") when ollama
-  was busy cold-loading or generating near the ~60s reverse-proxy cut-off; plain `openai`/`curl`
+  was busy cold-loading or generating for a long time; plain `openai`/`curl`
   succeeded when the box was calm. The generation observation still lands (type, model, prompt) but with
-  an empty completion. This is an ollama-on-CPU + proxy-timeout artifact, **not** a Langfuse issue —
-  Langfuse stored exactly what was sent. Worth a look from anyone with a warm/GPU ollama.
+  an empty completion. This is an ollama-on-CPU + client-timeout artifact, **not** a Langfuse issue —
+  Cloudron's proxy does not cut requests at 60 seconds (it reads for up to 3500 s), so the limit a
+  caller hits is the caller's own client timeout or ollama closing the connection. Langfuse stored
+  exactly what was sent. Worth a look from anyone with a warm/GPU ollama.
 - **Diagnose silent export failures from the emitter, not the receiver.** When an app's traces don't
   appear, read that app's own debug log first (`RUST_LOG=...,h2=debug` is what surfaced agentgateway's
   literal nginx rejection body). It beats reproducing from the Langfuse side.

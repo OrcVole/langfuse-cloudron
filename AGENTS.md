@@ -82,30 +82,22 @@ check, gotcha 31 → see ADR 0003).
 
 ## Pinned upstream (verified by `skopeo inspect`, 2026-06-26)
 
-- `cloudron/base:5.0.0@sha256:04fd70dbd8ad6149c19de39e35718e024417c3e01dc9c6637eaf4a41ec4e596c`
-- `langfuse/langfuse:3.199.0@sha256:21d2596b364b63f880e5e0f53153719dd85562451f05cc406c6c4a9b0f5e2b01`
-  (web — `node:24-alpine` / **musl**; Node 24.18.0; `WORKDIR /app`; runs `node ./web/server.js`)
-- `langfuse/langfuse-worker:3.199.0@sha256:8999216f0e18f445bb19195423aa7dbb58e64114c3c4d4c8fe27856994169130`
+- `cloudron/base:6.0.0@sha256:9bed4c8fa880645f8e669041ee28febe941481d00e9445e3e5a5483cb541d09b` (Ubuntu 26.04, glibc 2.43)
+- `ghcr.io/langfuse/langfuse:4.62.0@sha256:b40241743c639226a4bcba90e8a4d7bcb3335bd9947f84034c99dd85e60580a2`
+  (web — Red Hat UBI 9 micro / glibc since 4.55, formerly `node:24-alpine`; Node 24.21.0; `WORKDIR /app`; runs `node ./web/server.js`)
+- `ghcr.io/langfuse/langfuse-worker:4.62.0@sha256:050653ef8847a09cb9c264896f832a90550fbc0cf3367ac0a1f5bf6de6f23b19`
   (worker — same base; runs `node worker/dist/index.js`)
 - ClickHouse server — **TBD**, pin `>=24.3` by digest in Phase 1.
 - MinIO server + `mc` — **TBD**, pin by digest in Phase 1.
 
-## Build shape (HYPOTHESIS — prove on the box in Phase 1; see ADR 0002)
+## Build shape (settled: glibc-native since 0.11.0; see ADR 0002 and ADR 0012)
 
-The upstream images are **`node:24-alpine` (musl libc)**; `cloudron/base` is **glibc Ubuntu 24.04**.
-A naive `COPY /app` onto the base yields a tree whose **node binary, Prisma 6.19.3 query engines, and
-the bundled golang-migrate binary are all musl-linked** and will not run under glibc (gotcha 36, hard
-form).
-
-- **Leading approach (musl-in-place):** run the upstream musl userland (its `node`, Prisma engines,
-  `migrate`) on `cloudron/base` via the musl loader + minimal Alpine libs, keeping every native
-  artifact musl-consistent. A version bump stays a one-ARG re-`COPY` (aligns with the future-compat
-  requirement). Risk: foreign-libc footguns (NSS/DNS).
-- **Alternative (glibc-native):** run the app JS on the base's glibc Node 24 and **regenerate** the
-  Prisma engines + rebuild native `.node` addons + the `migrate` binary for glibc. More idiomatic but
-  fragile across upstream changes.
-
-Decide empirically with the runtime smoke test (Prisma reaches Postgres, ClickHouse migration runs).
+Until upstream 4.54 the images were `node:24-alpine` (musl) and the package ran the upstream musl
+userland in place under `/opt/musl/lib`. From 4.55 upstream builds on Red Hat UBI 9 micro (glibc 2.34,
+RHEL's Node 24 with a separate `libnode.so`, Prisma `rhel-openssl-3.0.x` engines). Those run unchanged
+on the base's newer glibc, so the package now copies `/usr/bin/node` and `/lib64/libnode.so.137` and
+points the Prisma env at the rhel engines. Every bump re-runs the `ldd` build gates, which fail the
+build if upstream changes its libc or Node layout again.
 
 ## Secrets (first-run-only, idempotent, `/app/data/.secrets`, mode 0600, re-assert every boot)
 

@@ -4,7 +4,7 @@ Date: 2026-06-26
 
 ## Status
 
-**Accepted** — Strategy 2 (musl-in-place). Both strategies were proven on the box; S2 chosen for
+**Superseded by ADR 0012 (0.11.0)**: upstream moved to glibc UBI images. Originally accepted: Strategy 2 (musl-in-place). Both strategies were proven on the box; S2 chosen for
 maintainability/reproducibility (operator-confirmed).
 
 ## Context
