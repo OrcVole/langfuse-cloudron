@@ -60,5 +60,15 @@ stray=$($ENGINE exec $APP sh -c 'ls -A /app/data/clickhouse /app/data/minio 2>/d
 chp=$($ENGINE exec $APP sh -c 'ls -d /var/lib/clickhouse/store >/dev/null 2>&1 && echo yes || echo no')
 [ "$chp" = yes ] && ok "ClickHouse store is on its persistentDir" || bad "ClickHouse store not at /var/lib/clickhouse"
 
+# v0.12.0 (ADR 0013): raw events expire and stay out of the backup.
+ilm=$($ENGINE exec $APP sh -c '. /app/data/.secrets/secrets.env; MC_HOST_local="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@localhost:9100" mc --config-dir /tmp/mc -q ilm rule export local/langfuse' 2>/dev/null)
+echo "$ilm" | grep -q '"Prefix": *"events/"' && echo "$ilm" | grep -Eq '"Days": *30([^0-9]|$)' \
+  && ok "MinIO expiry rule on events/ (30 days, the default)" || bad "no 30-day expiry rule on events/: $(echo "$ilm" | head -c 160)"
+ttl=$($ENGINE exec $APP sh -c '. /app/data/.secrets/secrets.env; curl -s "http://localhost:8123/?user=clickhouse&password=${CLICKHOUSE_PASSWORD}" --data-binary "SELECT engine_full FROM system.tables WHERE database = '"'default'"' AND name = '"'blob_storage_file_log'"'"' 2>/dev/null)
+echo "$ttl" | grep -q 'TTL created_at + toIntervalDay(30)' && ok "blob_storage_file_log TTL matches (30 days)" || bad "blob_storage_file_log TTL missing: $(echo "$ttl" | head -c 160)"
+$ENGINE exec $APP /app/code/conf/backup-clickhouse.sh >/dev/null 2>&1
+bk=$($ENGINE exec $APP sh -c 'test -d /app/data/minio-backup/.minio.sys && echo copied; test -e /app/data/minio-backup/langfuse/events && echo events')
+[ "$bk" = copied ] && ok "backupCommand copies MinIO without events/" || bad "backupCommand MinIO copy wrong (got: $(echo $bk))"
+
 echo "=== ingest result: $fails failure(s) ==="
 exit $(( fails > 0 ? 1 : 0 ))

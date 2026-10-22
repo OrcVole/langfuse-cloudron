@@ -50,7 +50,7 @@ FROM quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9be
 # cloudron/base 6.0.0 (Ubuntu 26.04, glibc 2.43; no Node.js, which is why the upstream node is copied
 # below). Tag 6.0.0 resolves to this digest. Re-run the secret scan after rebuilding (field guide
 # #266: the base ships no SSH host keys, found/pinned-ok/expected must all read 0).
-FROM docker.io/cloudron/base:6.0.0@sha256:9bed4c8fa880645f8e669041ee28febe941481d00e9445e3e5a5483cb541d09b
+FROM docker.io/cloudron/base:6.0.1@sha256:7b1e729960c3ca312d26e886917ba89483241bba0219ff292858e10d9d5768ee
 
 ARG LANGFUSE_VERSION
 ENV LANGFUSE_VERSION=${LANGFUSE_VERSION}

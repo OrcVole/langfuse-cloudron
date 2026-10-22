@@ -36,6 +36,9 @@ These are the real constraints, and they are stricter than "speaks S3":
    addressing would need a wildcard subdomain per bucket, which Cloudron does not give us.
 3. **Single-node, single-drive, small footprint.** This is an embedded store inside one app container,
    not a cluster. On a real install it holds on the order of 100 KB.
+   **Corrected 2026-10-22 ([ADR 0013](0013-raw-events-out-of-the-backup.md)):** since Langfuse 4 writes every
+   ingestion request to `events/`, a busy install holds hundreds of thousands of objects and gigabytes;
+   a successor must handle that object count, and raw events now expire after 30 days by default.
 4. **Restorable from a plain file copy.** v0.2.0's `backupCommand` copies the store as a file tree
    ([ADR 0006](0006-clickhouse-backup-persistentdirs-triplet.md)). A candidate whose on-disk state is
    not coherent when copied would need its own dump mechanism, which is a materially bigger change.

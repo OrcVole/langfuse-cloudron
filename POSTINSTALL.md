@@ -43,5 +43,11 @@ live analytics store is preserved as it is. If you want a true point-in-time cop
 instead, which rebuilds everything from the backup. If you specifically need an in-place restore to
 roll the analytics data back too, `docs/KNOWN-ISSUES.md` has the short recipe.
 
+Langfuse also keeps a raw copy of every ingestion request in its object storage, which it re-reads only
+to retry or replay ingestion. Those raw copies are **not** included in backups (there can be hundreds of
+thousands of them) and expire after **30 days**. To change the period, add
+`export LANGFUSE_EVENT_RETENTION_DAYS=<days>` to `/app/data/env.sh` and restart; `0` keeps them forever.
+Your traces, observations and scores are unaffected either way.
+
 If you are updating from 0.1.0, the first boot performs a one-time data migration and takes noticeably
 longer than usual. It is resumable, so an interrupted update continues rather than starting over.

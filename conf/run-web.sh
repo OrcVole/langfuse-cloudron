@@ -39,6 +39,43 @@ log "postgres: cleanup + migrate deploy"
 log "clickhouse: migrate up"
 ( cd ./packages/shared && bash ./clickhouse/scripts/up.sh )   # bash, NOT sh: up.sh uses bashisms (&>)
 
+# Raw-event retention (ADR 0013), re-applied on every boot so a changed LANGFUSE_EVENT_RETENTION_DAYS
+# takes effect on restart. Never fatal: retention is housekeeping, and a failure here must not keep
+# the web process down. The bucket's lifecycle is ours alone, so it is replaced whole (import), which
+# makes the step idempotent without parsing the rules already there.
+apply_event_retention() {
+  local days="${LANGFUSE_EVENT_RETENTION_DAYS:-30}"
+  if ! [[ "${days}" =~ ^[0-9]+$ ]]; then
+    log "WARNING: LANGFUSE_EVENT_RETENTION_DAYS='${days}' is not a whole number; retention left unchanged"
+    return 0
+  fi
+  local mc=(mc --config-dir /run/langfuse/mc --quiet)   # the rootfs is read-only; mc writes a config dir
+  export MC_HOST_local="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@localhost:9100"
+  local ch=(clickhouse-client --user clickhouse --password "${CLICKHOUSE_PASSWORD}")
+  local current
+  current="$("${ch[@]}" --query "SELECT engine_full FROM system.tables WHERE database = 'default' AND name = 'blob_storage_file_log'" 2>/dev/null || true)"
+  if [ "${days}" -eq 0 ]; then
+    "${mc[@]}" ilm rule rm --all --force local/langfuse >/dev/null 2>&1 || true
+    if [[ "${current}" == *" TTL "* ]]; then
+      "${ch[@]}" --query "ALTER TABLE default.blob_storage_file_log REMOVE TTL" || log "WARNING: could not remove the blob_storage_file_log TTL"
+    fi
+    log "event retention: off (events kept forever)"
+    return 0
+  fi
+  printf '{"Rules":[{"ID":"langfuse-events-expiry","Status":"Enabled","Filter":{"Prefix":"events/"},"Expiration":{"Days":%d}}]}\n' "${days}" \
+    | "${mc[@]}" ilm rule import local/langfuse >/dev/null \
+    || { log "WARNING: could not set the MinIO expiry rule on events/"; }
+  # MODIFY TTL rewrites the table's parts, so only issue it when the TTL actually differs.
+  if [[ -z "${current}" ]]; then
+    log "WARNING: blob_storage_file_log not found; its TTL is not set"
+  elif [[ "${current}" != *"TTL created_at + toIntervalDay(${days})"* ]]; then
+    "${ch[@]}" --query "ALTER TABLE default.blob_storage_file_log MODIFY TTL created_at + INTERVAL ${days} DAY DELETE" \
+      || log "WARNING: could not set the blob_storage_file_log TTL"
+  fi
+  log "event retention: ${days} days (MinIO events/ expiry + blob_storage_file_log TTL)"
+}
+apply_event_retention
+
 touch /run/langfuse/migrated
 log "migrations complete — starting web on 0.0.0.0:${PORT}"
 exec /usr/local/bin/node ./web/server.js --keepAliveTimeout 110000

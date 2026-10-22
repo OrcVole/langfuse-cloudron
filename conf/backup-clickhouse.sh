@@ -93,8 +93,12 @@ if [ -d "${MINIO_STORE}" ] && [ -n "$(ls -A "${MINIO_STORE}" 2>/dev/null)" ]; th
   log "copying MinIO ${MINIO_STORE} -> ${MDUMP}"
   rm -rf "${MDUMP}.new" "${MDUMP}.old"
   mrc=0
+  # events/ is left out (ADR 0013): raw ingestion data, re-read by Langfuse only to retry or replay,
+  # one object per event. Copied, it put 384,050 files into /app/data on one production install and
+  # Cloudron's uploader ran out of heap listing them, which stopped the whole server's backup run.
   rsync -a --delete \
     --exclude='/.minio.sys/tmp/' \
+    --exclude='/langfuse/events/' \
     --exclude='/.migration-in-progress' --exclude='/.migration-verified' \
     --exclude='/.migration-cleanup-pending' \
     "${MINIO_STORE}/" "${MDUMP}.new/" || mrc=$?

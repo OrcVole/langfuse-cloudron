@@ -224,6 +224,15 @@ fi
 # shellcheck disable=SC1091
 source "${DATA}/env.sh"
 
+# ------------------------------------------------------------------------------------------------
+# 3d. Raw-event retention (ADR 0013). Langfuse v4 writes the raw data of every ingestion request to
+#     MinIO under events/, and re-reads it only to retry failed ingestion or to replay. Unbounded, it
+#     reached 384,050 objects on one production install and crashed Cloudron's backup uploader.
+#     run-web.sh applies an expiry rule of this many days to events/ and a matching TTL to the
+#     blob_storage_file_log table. 0 keeps events forever. Set after env.sh so env.sh can override it.
+# ------------------------------------------------------------------------------------------------
+export LANGFUSE_EVENT_RETENTION_DAYS="${LANGFUSE_EVENT_RETENTION_DAYS:-30}"
+
 log "origin ${NEXTAUTH_URL}  encryption_key present  pg set  redis ${REDIS_HOST}:${REDIS_PORT}"
 
 # ------------------------------------------------------------------------------------------------

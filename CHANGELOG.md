@@ -1,3 +1,23 @@
+[0.12.0]
+
+- Fix: backups of a busy install could crash and stop the whole server's backup run. Langfuse 4 stores
+  the raw data of every ingestion request as a separate object in the bundled MinIO, and the backup
+  copied all of them into `/app/data`; on an install with a few hundred thousand of them, Cloudron's
+  backup uploader ran out of memory listing the files, and every app scheduled after this one was left
+  without a backup. The backup now leaves these raw event objects out. They are only re-read by Langfuse
+  to retry failed ingestion or to replay; the traces, observations and scores built from them are in
+  ClickHouse, which is backed up as before. On a test install with 20,000 events the MinIO part of the
+  backup went from 20,169 files (238 MB) to 11 files (124 KB).
+- New: raw event objects now expire after 30 days (Langfuse's own recommendation for the event bucket,
+  and the period Langfuse Cloud uses), with a matching TTL on the `blob_storage_file_log` table, so the
+  live store no longer grows without bound. Set `LANGFUSE_EVENT_RETENTION_DAYS` in `/app/data/env.sh` to
+  change it; `0` keeps events forever. On the first start after updating, events older than the period
+  are removed gradually in the background. Your traces, observations and scores are not affected.
+- After a restore, the raw events from before the backup are no longer present, so ingestion that had
+  not been processed at backup time cannot be replayed from them.
+- Base image cloudron/base 6.0.0 to 6.0.1: Ubuntu security updates, including the removal of the
+  compromised eMudhra emSign ECC Root CA - G3 from the trusted certificates.
+
 [0.11.0]
 
 - Base image cloudron/base 5.1.0 to 6.0.0 (Ubuntu 26.04, glibc 2.43).

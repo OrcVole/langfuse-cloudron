@@ -148,6 +148,9 @@ foreign-key direction: a media blob (MinIO) referenced by a trace/observation ro
     and may itself be a defect. If event uploads are later fixed, MinIO's churn rises from bookkeeping
     cadence to ingestion cadence and Decision M stops being cheap insurance and becomes necessary. That
     is a Langfuse-behaviour question and must not be allowed to delay v0.2.0.
+  - **Caveat realised and closed, 2026-10-22:** event uploads did start (Langfuse 4); the copy reached
+    384,050 event objects and crashed the platform's backup uploader. [ADR 0013](0013-raw-events-out-of-the-backup.md)
+    leaves `events/` out of the copy and expires raw events after 30 days.
 
 ## Migration — the already-shipped trap (greenfield ≠ published)
 
