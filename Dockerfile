@@ -16,9 +16,9 @@
 #   userland instead; that is gone. A version bump is "change LANGFUSE_VERSION, rebuild", then re-run
 #   the ldd gates below: they fail the BUILD if upstream changes its libc or node layout again.
 
-ARG LANGFUSE_VERSION=4.62.0
+ARG LANGFUSE_VERSION=4.67.0
 
-# ----- pinned upstream sources (langfuse digests resolved 2026-10-16) -------------------------------------
+# ----- pinned upstream sources (langfuse digests resolved 2026-10-22) -------------------------------------
 # v4.x web/worker images come from ghcr.io: upstream's Docker Hub push for 4.2.0 never happened
 # (Hub tops out at 4.1.0 as of 2026-08-02) while ghcr.io carries the 4.x line under the langfuse org.
 # ClickHouse 26.4 is langfuse v4's RECOMMENDED version (25.12 is the floor); digest re-resolved from
@@ -40,15 +40,15 @@ ARG LANGFUSE_VERSION=4.62.0
 # MinIO's inter-node clustering RPC, inert in the single-node standalone mode this package runs
 # (one MINIO_STORE path, no distributed/erasure-coding flags). Re-check every future bump.
 # mc: same content as before (digest unchanged), only the registry moved.
-FROM ghcr.io/langfuse/langfuse:4.62.0@sha256:b40241743c639226a4bcba90e8a4d7bcb3335bd9947f84034c99dd85e60580a2            AS lfweb
-FROM ghcr.io/langfuse/langfuse-worker:4.62.0@sha256:050653ef8847a09cb9c264896f832a90550fbc0cf3367ac0a1f5bf6de6f23b19     AS lfworker
+FROM ghcr.io/langfuse/langfuse:4.67.0@sha256:8e2b58b5086bfc955452a12c72eb2306bf3cb2ec59de8115454514c4c8e36e33            AS lfweb
+FROM ghcr.io/langfuse/langfuse-worker:4.67.0@sha256:a0ec08090953ad8d710565a23cda1b24e84dc889c9122e88df2c5b8ada4cfe1f     AS lfworker
 FROM docker.io/clickhouse/clickhouse-server:26.4@sha256:c7796a1335d14385c052f10061cf719f4a368a908432ec25980860b1333e9ccd AS clickhouse
 FROM quay.io/minio/minio@sha256:cf3dadcfa1fb0324f43958bad1abba986d53c4ecc04d4d50b46c7dcda28bd3cd                        AS minio
 FROM quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727                           AS mc
 
 # =================================================================================================
-# cloudron/base 6.0.0 (Ubuntu 26.04, glibc 2.43; no Node.js, which is why the upstream node is copied
-# below). Tag 6.0.0 resolves to this digest. Re-run the secret scan after rebuilding (field guide
+# cloudron/base 6.0.1 (Ubuntu 26.04, glibc 2.43; no Node.js, which is why the upstream node is copied
+# below). Tag 6.0.1 resolves to this digest. Re-run the secret scan after rebuilding (field guide
 # #266: the base ships no SSH host keys, found/pinned-ok/expected must all read 0).
 FROM docker.io/cloudron/base:6.0.1@sha256:7b1e729960c3ca312d26e886917ba89483241bba0219ff292858e10d9d5768ee
 

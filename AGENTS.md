@@ -82,10 +82,10 @@ check, gotcha 31 → see ADR 0003).
 
 ## Pinned upstream (verified by `skopeo inspect`, 2026-06-26)
 
-- `cloudron/base:6.0.0@sha256:9bed4c8fa880645f8e669041ee28febe941481d00e9445e3e5a5483cb541d09b` (Ubuntu 26.04, glibc 2.43)
-- `ghcr.io/langfuse/langfuse:4.62.0@sha256:b40241743c639226a4bcba90e8a4d7bcb3335bd9947f84034c99dd85e60580a2`
+- `cloudron/base:6.0.1@sha256:7b1e729960c3ca312d26e886917ba89483241bba0219ff292858e10d9d5768ee` (Ubuntu 26.04, glibc 2.43)
+- `ghcr.io/langfuse/langfuse:4.67.0@sha256:8e2b58b5086bfc955452a12c72eb2306bf3cb2ec59de8115454514c4c8e36e33`
   (web — Red Hat UBI 9 micro / glibc since 4.55, formerly `node:24-alpine`; Node 24.21.0; `WORKDIR /app`; runs `node ./web/server.js`)
-- `ghcr.io/langfuse/langfuse-worker:4.62.0@sha256:050653ef8847a09cb9c264896f832a90550fbc0cf3367ac0a1f5bf6de6f23b19`
+- `ghcr.io/langfuse/langfuse-worker:4.67.0@sha256:a0ec08090953ad8d710565a23cda1b24e84dc889c9122e88df2c5b8ada4cfe1f`
   (worker — same base; runs `node worker/dist/index.js`)
 - ClickHouse server — **TBD**, pin `>=24.3` by digest in Phase 1.
 - MinIO server + `mc` — **TBD**, pin by digest in Phase 1.

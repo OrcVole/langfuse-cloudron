@@ -1,3 +1,12 @@
+[0.13.0]
+
+- Update langfuse 4.62.0 to 4.67.0. The update applies 2 PostgreSQL migrations (a new `none` gateway
+  ingestion mode, and two nullable columns on the Slack integrations table), both quick; there are no
+  ClickHouse migrations. Fixes in this range: LIKE wildcards are escaped in the remaining Prisma
+  substring and filter queries (4.65.0), the Owner role cannot be selected without the ownership
+  permission (4.66.0), and project keys whose path names another project are refused by the public
+  API (4.64.0). Dependency patches include qs, nodemailer, hono and undici.
+
 [0.12.0]
 
 - Fix: backups of a busy install could crash and stop the whole server's backup run. Langfuse 4 stores
