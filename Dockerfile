@@ -45,6 +45,8 @@ FROM ghcr.io/langfuse/langfuse-worker:4.67.0@sha256:a0ec08090953ad8d710565a23cda
 FROM docker.io/clickhouse/clickhouse-server:26.4@sha256:c7796a1335d14385c052f10061cf719f4a368a908432ec25980860b1333e9ccd AS clickhouse
 FROM quay.io/minio/minio@sha256:cf3dadcfa1fb0324f43958bad1abba986d53c4ecc04d4d50b46c7dcda28bd3cd                        AS minio
 FROM quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727                           AS mc
+# Official Node.js 24.22.1 (security release 2026-10-20), glibc build; replaces the RHEL node 24.21.0 below.
+FROM docker.io/library/node:24.22.1-bookworm-slim@sha256:2dd9a4f758e173b65fee15388f7706af6fb01ef50cf7a2c0538711d67a6981ae AS officialnode
 
 # =================================================================================================
 # cloudron/base 6.0.1 (Ubuntu 26.04, glibc 2.43; no Node.js, which is why the upstream node is copied
@@ -73,7 +75,11 @@ COPY --from=lfweb /lib64/libnode.so.137   /usr/local/lib/libnode.so.137
 #    RHEL's Node is a small-icu build whose ICU DATA is a separate file at a compiled-in path. Without
 #    it Intl.Segmenter segfaults (the Prisma CLI hit it at start: SIGSEGV in JSSegments::Create).
 COPY --from=lfweb /usr/share/node-24/icudata /usr/share/node-24/icudata
-RUN ldconfig
+#    Node.js 24.22.1 security release (CVE-2026-111497 Brotli RCE, TLS hostname bypasses, CA store): the
+#    upstream image's node is 24.21.0, so the official self-contained binary replaces the launcher.
+#    libnode.so.137 above stays on disk but is no longer loaded by /usr/local/bin/node.
+COPY --from=officialnode /usr/local/bin/node /usr/local/bin/node
+RUN ldconfig && test "$(node --version)" = "v24.22.1" || { echo "FATAL: node is not v24.22.1"; exit 1; }
 
 # -------------------------------------------------------------------------------------------------
 # 2. The Langfuse application trees + Prisma CLI (migrations) + the static ClickHouse migrate binary.
@@ -133,7 +139,8 @@ COPY --from=mc    /usr/bin/mc    /usr/bin/mc
 #    and live libc-isolation proofs run in the runtime smoke test).
 # -------------------------------------------------------------------------------------------------
 RUN echo "== gate: node + shared-library closure ==" && node --version \
- && { ldd /usr/local/bin/node /usr/local/lib/libnode.so.137 2>&1 | grep -i 'not found' && { echo 'node: unresolved libs'; exit 1; } || true; } \
+ && [ "$(node --version)" = "v24.22.1" ] \
+ && { ldd /usr/local/bin/node 2>&1 | grep -i 'not found' && { echo 'node: unresolved libs'; exit 1; } || true; } \
  && { ldd /app/code/.engines/query-engine.so.node /app/code/.engines/schema-engine 2>&1 | grep -i 'not found' && { echo 'prisma engines: unresolved libs'; exit 1; } || true; } \
  && node -p "'node '+process.versions.node+' openssl '+process.versions.openssl" \
  && node -e "const n=[...new Intl.Segmenter('en',{granularity:'word'}).segment('hi there')].length; if(n<3) process.exit(1); console.log('Intl.Segmenter ok ('+n+' segments)')" \

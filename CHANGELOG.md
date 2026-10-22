@@ -1,3 +1,7 @@
+[0.13.1]
+
+- Node.js 24.21.0 to 24.22.1 (security release: CVE-2026-111497 Brotli remote code execution, TLS hostname-verification bypasses, updated CA store)
+
 [0.13.0]
 
 - Update langfuse 4.62.0 to 4.67.0. The update applies 2 PostgreSQL migrations (a new `none` gateway
