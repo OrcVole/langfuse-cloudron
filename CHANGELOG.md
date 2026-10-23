@@ -1,3 +1,14 @@
+[0.13.2]
+
+- Fix ClickHouse merges failing in a loop on larger installs. Langfuse's `events_full` table carries
+  full-text indexes that are rebuilt for the whole merged part during every merge, and with up to 32
+  merges at once the bundled ClickHouse ran into its 2.5 GiB memory cap (MEMORY_LIMIT_EXCEEDED, about
+  1.4 times a second on a 400,000-event install), so parts piled up and the 30-day retention could not
+  drop old rows. The ClickHouse cap is now 4 GiB, background merges are limited to 4 threads, and the
+  app's memory limit rises from 6 GiB to 8 GiB to keep the same headroom for the web and worker
+  processes. If you changed this app's memory limit by hand, check it is at least 8 GiB.
+- Langfuse itself is unchanged (4.67.0).
+
 [0.13.1]
 
 - Node.js 24.21.0 to 24.22.1 (security release: CVE-2026-111497 Brotli remote code execution, TLS hostname-verification bypasses, updated CA store)

@@ -57,8 +57,23 @@
          v0.3.0: raised 2 GiB to 2.5 GiB with ClickHouse 26.4, whose memory accounting is RSS-based and
          whose baseline footprint is larger than 25.3's: on a 32-core host the old cap was breached at
          near-idle (RSS 2.16 GiB) and EVERY query then failed MEMORY_LIMIT_EXCEEDED, caught by
-         test/ingest.sh. The app's total memoryLimit moved 5 to 6 GiB in the same change. -->
-    <max_server_memory_usage>2684354560</max_server_memory_usage>
+         test/ingest.sh. The app's total memoryLimit moved 5 to 6 GiB in the same change.
+         v0.13.2 (ADR 0014): raised 2.5 GiB to 4 GiB, memoryLimit 6 to 8 GiB. Langfuse's events_full carries
+         full-text indexes with one granule per part, so every merge rebuilds the index for the whole merged
+         part in memory. On production (404k events, RSS 1.40 GiB at rest) one October merge failed
+         MEMORY_LIMIT_EXCEEDED in a loop, about 1.4 times a second. -->
+    <max_server_memory_usage>4294967296</max_server_memory_usage>
+
+    <!-- v0.13.2 (ADR 0014): at most 4 merge threads (8 merges with the default ratio of 2) instead of 16 (32),
+         because concurrent events_full merges are what add up past the cap. The three merge_tree thresholds
+         below must not exceed the pool, or ClickHouse REFUSES TO START (Code 36: the mutation threshold
+         defaults to 20). -->
+    <background_pool_size>4</background_pool_size>
+    <merge_tree>
+        <number_of_free_entries_in_pool_to_execute_mutation>4</number_of_free_entries_in_pool_to_execute_mutation>
+        <number_of_free_entries_in_pool_to_lower_max_size_of_merge>4</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
+        <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>4</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
+    </merge_tree>
     <mark_cache_size>536870912</mark_cache_size>
 
     <!-- v0.2.1 (ADR 0011): bound ClickHouse's own telemetry tables. Left on defaults they grow without

@@ -68,12 +68,12 @@ check, gotcha 31 → see ADR 0003).
   Tag scheme `:<LANGFUSE_VERSION>-<pkg-rev>` — first build `:3.199.0-1`; rebuilds of the same upstream
   bump `-2`, `-3`. **Confirm exact namespace casing** against an existing package (docling/tei) before
   the first push (GHCR forces lowercase → `orcvole`).
-- **memoryLimit:** **5 GiB (`5368709120`)** — Phase-4 measured (ingestion peak 2.58 GiB; worst-case
-  bound ~4.6 GiB from the 2 GiB ClickHouse cap; ADR 0005). Constrained-box option: 4 GiB + CH cap
-  1.5 GiB. Pin bundled-service memory so nothing sizes against host RAM:
-  - ClickHouse: **absolute** cap via a `config.d` override —
-    `<max_server_memory_usage>2147483648</max_server_memory_usage>` (2 GiB). Absolute, not a ratio:
-    it is unverified whether the bundled ClickHouse reads the cgroup limit or host RAM.
+- **memoryLimit:** **8 GiB (`8589934592`)** since v0.13.2 (5 GiB originally, ADR 0005; 6 GiB from v0.3.0).
+  Pin bundled-service memory so nothing sizes against host RAM:
+  - ClickHouse: **absolute** cap in `conf/clickhouse/config.d/cloudron.xml`, **4 GiB** since v0.13.2
+    (2 GiB, then 2.5 GiB; ADR 0014). Absolute, not a ratio: it is unverified whether the bundled
+    ClickHouse reads the cgroup limit or host RAM. `background_pool_size` 4, with the three
+    `number_of_free_entries_in_pool_*` thresholds at 4 (above the pool, ClickHouse will not start).
   - `langfuse-web` / `langfuse-worker`: `NODE_OPTIONS=--max-old-space-size=768` (provisional).
 - **contactEmail:** `Most+github@OrcadianVole.com` (GitHub-verified public alias on the OrcVole
   namespace; ships in the public manifest, leaks no private infra). Never a box/mirror address.
