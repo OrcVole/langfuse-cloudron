@@ -7,7 +7,7 @@
   "changelog": "file://CHANGELOG.md",
   "icon": "file://logo.png",
   "tags": [ "notes", "project" ],
-  "version": "0.13.1",
+  "version": "0.13.2",
   "upstreamVersion": "4.67.0",
   "healthCheckPath": "/api/public/health",
   "httpPort": 3000,
@@ -34,7 +34,7 @@
       "defaultValue": "langfuse-blob"
     }
   },
-  "memoryLimit": 6442450944,
+  "memoryLimit": 8589934592,
   "configurePath": "/",
   "optionalSso": true,
   "postInstallMessage": "file://POSTINSTALL.md",
@@ -47,5 +47,5 @@
   "contactEmail": "Most+github@OrcadianVole.com",
   "iconUrl": "https://raw.githubusercontent.com/OrcVole/langfuse-cloudron/main/logo.png",
   "mediaLinks": [ "https://raw.githubusercontent.com/OrcVole/langfuse-cloudron/main/logo.png" ],
-  "dockerImage": "ghcr.io/orcvole/langfuse-cloudron@sha256:33d169806588bb8e0c518e3c1d39a79d6ad587d939cafde5700751ed8cd4e8d1"
+  "dockerImage": "ghcr.io/orcvole/langfuse-cloudron@sha256:ec9956ea1fe2d98e17b6fdf2a88db8e06020a23c9887ce77830718650a559b67"
 }
