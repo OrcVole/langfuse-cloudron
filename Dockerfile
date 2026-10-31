@@ -16,7 +16,7 @@
 #   userland instead; that is gone. A version bump is "change LANGFUSE_VERSION, rebuild", then re-run
 #   the ldd gates below: they fail the BUILD if upstream changes its libc or node layout again.
 
-ARG LANGFUSE_VERSION=4.67.0
+ARG LANGFUSE_VERSION=4.72.0
 
 # ----- pinned upstream sources (langfuse digests resolved 2026-10-22) -------------------------------------
 # v4.x web/worker images come from ghcr.io: upstream's Docker Hub push for 4.2.0 never happened
@@ -40,8 +40,8 @@ ARG LANGFUSE_VERSION=4.67.0
 # MinIO's inter-node clustering RPC, inert in the single-node standalone mode this package runs
 # (one MINIO_STORE path, no distributed/erasure-coding flags). Re-check every future bump.
 # mc: same content as before (digest unchanged), only the registry moved.
-FROM ghcr.io/langfuse/langfuse:4.67.0@sha256:8e2b58b5086bfc955452a12c72eb2306bf3cb2ec59de8115454514c4c8e36e33            AS lfweb
-FROM ghcr.io/langfuse/langfuse-worker:4.67.0@sha256:a0ec08090953ad8d710565a23cda1b24e84dc889c9122e88df2c5b8ada4cfe1f     AS lfworker
+FROM ghcr.io/langfuse/langfuse:4.72.0@sha256:c311fd9db4b69f6514fdcb1b86a2a105d5a4ed51fbf0ded033ff2722459c804a            AS lfweb
+FROM ghcr.io/langfuse/langfuse-worker:4.72.0@sha256:aa1724b989a00f1e4ca9930709202489c73deaaf2f1116bbd3d71c77edb8fedb     AS lfworker
 FROM docker.io/clickhouse/clickhouse-server:26.4@sha256:c7796a1335d14385c052f10061cf719f4a368a908432ec25980860b1333e9ccd AS clickhouse
 FROM quay.io/minio/minio@sha256:cf3dadcfa1fb0324f43958bad1abba986d53c4ecc04d4d50b46c7dcda28bd3cd                        AS minio
 FROM quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727                           AS mc
