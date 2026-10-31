@@ -1,3 +1,7 @@
+[0.13.3]
+
+- Update langfuse 4.67.0 to 4.72.0. The update applies 6 PostgreSQL migrations (an API key to user binding, a user support access table, a PagerDuty action type, a gateway ingestion mode, a Slack integration installer, and a background migration that encrypts legacy webhook headers). Security items in upstream's notes: the web and worker images install Node.js 24.22.1 security fixes (#19405, #19406), and a webhook or PostHog destination now requires its secrets again when the destination changes (#19261). Take a backup before updating, as for any langfuse update: the migrations are not reversible by the package.
+
 [0.13.2]
 
 - Fix ClickHouse merges failing in a loop on larger installs. Langfuse's `events_full` table carries
