@@ -1,3 +1,24 @@
+[0.14.0]
+
+- Update langfuse 4.72.0 to 4.80.0. The update applies 18 PostgreSQL migrations (role assignments backfilled from
+  existing organisation and project memberships, an access audit log setting, an API key scope, AI gateway providers
+  and options, storage role authentication columns, Topics run columns, a batch action cursor, and an annotation
+  queue index rebuilt concurrently) and 3 ClickHouse migrations: 0054 adds a column to the audit log table, 0055
+  converts the Topics embedding column and indexes topic assignments, and 0056 changes only the default of the
+  `event_bytes` column on `events_full`. No migration rewrites existing traces, observations or events. Take a
+  backup before updating, as for any langfuse update: the migrations are not reversible by the package.
+- Security items in upstream's notes: a session is now bound to the user id it was issued for, so a session issued
+  to a deleted account no longer resolves to a new account with the same email (#20078); storage integration secrets
+  are required again when the bucket or endpoint changes (#19566), and webhook header values when the endpoint URL
+  changes (#19565). Dependency updates include undici, nodemailer, fast-xml-parser and Next.js.
+- Upstream change you may notice: langfuse 4.77 removed automatic tokenisation. Token counts, and the costs derived
+  from them, are now recorded only when your SDK or integration reports usage; they are no longer estimated from the
+  input and output text.
+- Idle CPU, two of the four parts described in KNOWN-ISSUES.md: the worker's queue metrics are now collected every
+  60 seconds instead of every second (set `LANGFUSE_QUEUE_METRICS_INTERVAL_MS` in `/app/data/env.sh` to change it),
+  and the bundled MinIO scans its objects at the slow speed (set `MINIO_SCANNER_SPEED` in `/app/data/env.sh` to
+  change it). If you added either workaround by hand, you can remove it. The ClickHouse parts are not in this version.
+
 [0.13.3]
 
 - Update langfuse 4.67.0 to 4.72.0. The update applies 6 PostgreSQL migrations (an API key to user binding, a user support access table, a PagerDuty action type, a gateway ingestion mode, a Slack integration installer, and a background migration that encrypts legacy webhook headers). Security items in upstream's notes: the web and worker images install Node.js 24.22.1 security fixes (#19405, #19406), and a webhook or PostHog destination now requires its secrets again when the destination changes (#19261). Take a backup before updating, as for any langfuse update: the migrations are not reversible by the package.

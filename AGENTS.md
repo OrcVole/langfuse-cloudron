@@ -80,12 +80,12 @@ check, gotcha 31 → see ADR 0003).
 - **Commit author:** `OrcVole <Most+github@OrcadianVole.com>`, set **repo-local** (never the machine's
   global git identity); identical author on GitHub + Forgejo. No co-author / AI trailers.
 
-## Pinned upstream (verified by `skopeo inspect`, 2026-06-26)
+## Pinned upstream (verified by `skopeo inspect`; langfuse images re-resolved 2026-11-14)
 
 - `cloudron/base:6.0.1@sha256:7b1e729960c3ca312d26e886917ba89483241bba0219ff292858e10d9d5768ee` (Ubuntu 26.04, glibc 2.43)
-- `ghcr.io/langfuse/langfuse:4.67.0@sha256:8e2b58b5086bfc955452a12c72eb2306bf3cb2ec59de8115454514c4c8e36e33`
-  (web — Red Hat UBI 9 micro / glibc since 4.55, formerly `node:24-alpine`; Node 24.21.0; `WORKDIR /app`; runs `node ./web/server.js`)
-- `ghcr.io/langfuse/langfuse-worker:4.67.0@sha256:a0ec08090953ad8d710565a23cda1b24e84dc889c9122e88df2c5b8ada4cfe1f`
+- `ghcr.io/langfuse/langfuse:4.80.0@sha256:0814758db3db8e923f733be3884e7d7a9e3afd60568d874a610d78aae47476c5`
+  (web — Red Hat UBI 9 micro / glibc since 4.55, formerly `node:24-alpine`; Node 24.22.1 as of 4.80.0; `WORKDIR /app`; runs `node ./web/server.js`)
+- `ghcr.io/langfuse/langfuse-worker:4.80.0@sha256:da9f618dd784219aa6508ab6941c4a89c4ef6fb429fb1734c4163df3baa8f1ca`
   (worker — same base; runs `node worker/dist/index.js`)
 - ClickHouse server — **TBD**, pin `>=24.3` by digest in Phase 1.
 - MinIO server + `mc` — **TBD**, pin by digest in Phase 1.

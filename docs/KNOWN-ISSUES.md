@@ -1,5 +1,44 @@
 # Known issues
 
+## Idle CPU: about a third of a core with no traffic (v0.13.3; partly fixed in v0.14.0)
+
+**What it is.** Measured 2026-11-04 on an install holding no data (13 queries in 10 minutes): 31% of one core
+at idle, by per-thread CPU over 30 s. Three upstream defaults (what v0.14.0 changes is below):
+
+1. **ClickHouse async-insert polling, ~10%.** `async_insert_threads` = 16, each waking every
+   `async_insert_poll_timeout_ms` = 10 ms (236 of 240 stack samples were `AsynchronousInsertQueue` timed waits).
+2. **ClickHouse `AsyncMetrics`, ~9%.** `asynchronous_metrics_update_period_s` = 1. Nothing reads the values:
+   `asynchronous_metric_log` is already removed (ADR 0011).
+3. **Worker queue metrics, ~9%.** `LANGFUSE_QUEUE_METRICS_ENABLED` defaults to `true` at
+   `LANGFUSE_QUEUE_METRICS_INTERVAL_MS` = 1000: depth and age of 32 BullMQ queues every second, about 350 Redis
+   commands/s. The gauges go to dogstatsd and CloudWatch, neither of which a Cloudron install has.
+
+A busy install adds a fourth: **the MinIO scanner** walks every raw-event object to apply the `events/` expiry rule
+(ADR 0013). With ~494,000 objects it ran a full cycle every 2.5–4 minutes at 32% of a core.
+
+**Shipped in v0.14.0** (two of the four parts; their saving has not been re-measured yet):
+
+- `start.sh` defaults `LANGFUSE_QUEUE_METRICS_INTERVAL_MS` to 60000 when it is not set. The runner stays enabled,
+  because the same pass prunes expired members of `langfuse:ingestion-failure:active-projects`. A value you set in
+  `/app/data/env.sh` still wins.
+- MinIO runs with `MINIO_SCANNER_SPEED=slow` unless `/app/data/env.sh` sets another value (`fastest`, `fast`,
+  `default`, `slow`, `slowest`). The variable overrides any speed stored with `mc admin config set local scanner
+  speed=...`, so set it in `env.sh` rather than with `mc`.
+
+**Upgrade note:** operators who added `export LANGFUSE_QUEUE_METRICS_INTERVAL_MS=60000` to `/app/data/env.sh`, or ran
+`mc admin config set local scanner speed=slow`, can remove the workaround; leaving it in place does no harm.
+
+**Still planned** (the ClickHouse parts, about 19 of the 31 points measured at idle; each to be boot-tested and
+re-measured, cgroup deltas, idle and under `test/ingest.sh`):
+
+- `cloudron.xml`: `async_insert_threads` 2; `async_insert_poll_timeout_ms` 100 in the default profile (adds at
+  most ~100 ms to an async insert's flush).
+- `asynchronous_metrics_update_period_s` raised, **but first** confirm which component corrects the RSS-based
+  memory tracker on 26.4: `memory_worker_correct_memory_tracker` is 0 by default, so AsyncMetrics may be doing it,
+  and the 4 GiB `max_server_memory_usage` cap depends on that. Keep it ≤ 10 s unless MemoryWorker takes over.
+- `background_schedule_pool_size` 512 → a small value; watch the Code 36 start-up trap noted above
+  `background_pool_size`.
+
 ## ClickHouse's own system logs grow without bound, and can starve queries (all versions)
 
 **What it is.** The bundled ClickHouse writes its internal telemetry (`system.query_log`,

@@ -16,9 +16,9 @@
 #   userland instead; that is gone. A version bump is "change LANGFUSE_VERSION, rebuild", then re-run
 #   the ldd gates below: they fail the BUILD if upstream changes its libc or node layout again.
 
-ARG LANGFUSE_VERSION=4.72.0
+ARG LANGFUSE_VERSION=4.80.0
 
-# ----- pinned upstream sources (langfuse digests resolved 2026-10-22) -------------------------------------
+# ----- pinned upstream sources (langfuse digests resolved 2026-11-14) -------------------------------------
 # v4.x web/worker images come from ghcr.io: upstream's Docker Hub push for 4.2.0 never happened
 # (Hub tops out at 4.1.0 as of 2026-08-02) while ghcr.io carries the 4.x line under the langfuse org.
 # ClickHouse 26.4 is langfuse v4's RECOMMENDED version (25.12 is the floor); digest re-resolved from
@@ -40,12 +40,13 @@ ARG LANGFUSE_VERSION=4.72.0
 # MinIO's inter-node clustering RPC, inert in the single-node standalone mode this package runs
 # (one MINIO_STORE path, no distributed/erasure-coding flags). Re-check every future bump.
 # mc: same content as before (digest unchanged), only the registry moved.
-FROM ghcr.io/langfuse/langfuse:4.72.0@sha256:c311fd9db4b69f6514fdcb1b86a2a105d5a4ed51fbf0ded033ff2722459c804a            AS lfweb
-FROM ghcr.io/langfuse/langfuse-worker:4.72.0@sha256:aa1724b989a00f1e4ca9930709202489c73deaaf2f1116bbd3d71c77edb8fedb     AS lfworker
+FROM ghcr.io/langfuse/langfuse:4.80.0@sha256:0814758db3db8e923f733be3884e7d7a9e3afd60568d874a610d78aae47476c5            AS lfweb
+FROM ghcr.io/langfuse/langfuse-worker:4.80.0@sha256:da9f618dd784219aa6508ab6941c4a89c4ef6fb429fb1734c4163df3baa8f1ca     AS lfworker
 FROM docker.io/clickhouse/clickhouse-server:26.4@sha256:c7796a1335d14385c052f10061cf719f4a368a908432ec25980860b1333e9ccd AS clickhouse
 FROM quay.io/minio/minio@sha256:cf3dadcfa1fb0324f43958bad1abba986d53c4ecc04d4d50b46c7dcda28bd3cd                        AS minio
 FROM quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727                           AS mc
-# Official Node.js 24.22.1 (security release 2026-10-20), glibc build; replaces the RHEL node 24.21.0 below.
+# Official Node.js 24.22.1 (security release 2026-10-20), glibc build; replaces the RHEL node below. The 4.80.0
+# upstream images ship RHEL's own Node 24.22.1 (upstream #19581 dropped its patched RPMs), so this is now redundant.
 FROM docker.io/library/node:24.22.1-bookworm-slim@sha256:2dd9a4f758e173b65fee15388f7706af6fb01ef50cf7a2c0538711d67a6981ae AS officialnode
 
 # =================================================================================================
@@ -76,7 +77,8 @@ COPY --from=lfweb /lib64/libnode.so.137   /usr/local/lib/libnode.so.137
 #    it Intl.Segmenter segfaults (the Prisma CLI hit it at start: SIGSEGV in JSSegments::Create).
 COPY --from=lfweb /usr/share/node-24/icudata /usr/share/node-24/icudata
 #    Node.js 24.22.1 security release (CVE-2026-111497 Brotli RCE, TLS hostname bypasses, CA store): the
-#    upstream image's node is 24.21.0, so the official self-contained binary replaces the launcher.
+#    upstream image's node was 24.21.0 when this was added (4.72.0; 4.80.0 ships 24.22.1), so the official
+#    self-contained binary replaces the launcher.
 #    libnode.so.137 above stays on disk but is no longer loaded by /usr/local/bin/node.
 COPY --from=officialnode /usr/local/bin/node /usr/local/bin/node
 RUN ldconfig && test "$(node --version)" = "v24.22.1" || { echo "FATAL: node is not v24.22.1"; exit 1; }

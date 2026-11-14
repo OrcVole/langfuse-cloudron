@@ -233,6 +233,19 @@ source "${DATA}/env.sh"
 # ------------------------------------------------------------------------------------------------
 export LANGFUSE_EVENT_RETENTION_DAYS="${LANGFUSE_EVENT_RETENTION_DAYS:-30}"
 
+# ------------------------------------------------------------------------------------------------
+# 3e. Idle CPU (v0.14.0, docs/KNOWN-ISSUES.md "Idle CPU"). The worker's queue-metrics runner defaults
+#     to a 1 s interval: depth and age of every BullMQ queue, about 350 Redis commands/s, for gauges
+#     that go to dogstatsd and CloudWatch, neither of which a Cloudron install has. 60 s instead. The
+#     runner stays ENABLED: the same pass prunes expired members of the ingestion-failure set.
+#     The bundled MinIO's scanner walks every raw-event object to apply the events/ expiry rule (ADR
+#     0013); at ~494,000 objects it ran a full cycle every 2.5-4 minutes at a third of a core. "slow"
+#     spaces it out. supervisord's minio program inherits it. MinIO lets this variable override a
+#     speed stored with `mc admin config set`. Both are set after env.sh so an operator's value wins.
+# ------------------------------------------------------------------------------------------------
+export LANGFUSE_QUEUE_METRICS_INTERVAL_MS="${LANGFUSE_QUEUE_METRICS_INTERVAL_MS:-60000}"
+export MINIO_SCANNER_SPEED="${MINIO_SCANNER_SPEED:-slow}"
+
 log "origin ${NEXTAUTH_URL}  encryption_key present  pg set  redis ${REDIS_HOST}:${REDIS_PORT}"
 
 # ------------------------------------------------------------------------------------------------
